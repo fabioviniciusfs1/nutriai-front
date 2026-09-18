@@ -1,0 +1,8 @@
+services:
+  nutriai-front:
+    build: .
+    image: nutriai-front:latest
+    container_name: nutriai-front
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
