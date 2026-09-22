@@ -1,8 +1,9 @@
 "use client";
 
 import { PieChart, Pie, Cell, ResponsiveContainer, type PieLabelRenderProps } from "recharts";
-import { MoreHorizontal } from "lucide-react";
-import { dailyCalorieGoal, macroBreakdown } from "@/lib/mock-data";
+import { MoreHorizontal, GlassWater } from "lucide-react";
+import { dailyCalorieGoal, dailyWaterGoal, macroBreakdown } from "@/lib/mock-data";
+import { ProgressBar } from "@/components/dashboard/ProgressBar";
 
 const RADIAN = Math.PI / 180;
 
@@ -44,8 +45,8 @@ export function MacroDonut() {
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col justify-center">
-        <div className="relative mx-auto h-56 w-56">
+      <div className="mt-4 flex flex-1 flex-col items-center gap-6 sm:flex-row sm:gap-10">
+        <div className="relative h-48 w-48 shrink-0 sm:h-56 sm:w-56">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -60,6 +61,7 @@ export function MacroDonut() {
                 stroke="none"
                 label={renderInsideLabel}
                 labelLine={false}
+                isAnimationActive={false}
               >
                 {macroBreakdown.map((entry) => (
                   <Cell key={entry.name} fill={entry.color} />
@@ -69,20 +71,24 @@ export function MacroDonut() {
           </ResponsiveContainer>
         </div>
 
-        <ul className="mt-4 flex flex-col gap-3 text-sm">
+        <div className="flex w-full flex-1 flex-col gap-3">
           {macroBreakdown.map((macro) => (
-            <li key={macro.name} className="flex items-center gap-2">
-              <span
-                className="h-3 w-3 shrink-0 rounded-full"
-                style={{ backgroundColor: macro.color }}
-              />
-              <span className="text-neutral-700">{macro.name}</span>
-              <span className="ml-auto text-neutral-400">
-                {macro.atual}/{macro.meta}g
-              </span>
-            </li>
+            <ProgressBar
+              key={macro.name}
+              label={macro.name}
+              atual={macro.atual}
+              meta={macro.meta}
+              unit="g"
+              color={macro.color}
+            />
           ))}
-        </ul>
+
+          <div className="mt-1 flex items-center gap-2 border-t border-neutral-100 pt-3 text-sm">
+            <GlassWater size={16} className="text-[#7fc1e8]" />
+            <span className="text-neutral-700">Água</span>
+            <span className="ml-auto font-semibold text-neutral-900">{dailyWaterGoal}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

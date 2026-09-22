@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { label: "Início", href: "/" },
+  { label: "Nutrientes", href: "/nutrientes" },
+  { label: "Histórico", href: "/historico" },
   { label: "Chat com IA", href: "/chat" },
 ];
 
@@ -18,12 +20,12 @@ export function Topbar() {
         <span className="text-xl">🌱</span>
       </div>
 
-      <nav className="flex flex-1 flex-wrap items-center gap-2">
+      <nav className="order-last grid w-full grid-cols-4 gap-1 md:order-none md:flex md:w-auto md:flex-1 md:items-center md:gap-2">
         {NAV_ITEMS.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+            className={`whitespace-nowrap rounded-full px-2 py-2 text-center text-xs font-medium transition-colors sm:text-sm md:px-4 ${
               pathname === item.href
                 ? "bg-accent text-white"
                 : "text-neutral-600 hover:bg-neutral-100"
@@ -34,7 +36,7 @@ export function Topbar() {
         ))}
       </nav>
 
-      <div className="flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-2 md:ml-0">
         <Image
           src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=80&h=80&q=70"
           alt="Foto de perfil de Masud A."

@@ -1,19 +1,50 @@
+import type { FoodFeedback } from "@/lib/food-feedback";
+
 export const dailyCalorieGoal = "2.000 kcal";
 
+export const dailyWaterGoal = "2,5 L";
+
 export const calorieIntake = [
-  { month: "Jan", calorias: 66, meta: 85 },
-  { month: "Fev", calorias: 74, meta: 85 },
-  { month: "Mar", calorias: 78, meta: 70 },
-  { month: "Abr", calorias: 68, meta: 75 },
-  { month: "Mai", calorias: 86, meta: 94 },
-  { month: "Jun", calorias: 72, meta: 66 },
-  { month: "Jul", calorias: 82, meta: 76 },
+  { day: "Seg", calorias: 1850, meta: 2000 },
+  { day: "Ter", calorias: 2120, meta: 2000 },
+  { day: "Qua", calorias: 1940, meta: 2000 },
+  { day: "Qui", calorias: 1780, meta: 2000 },
+  { day: "Sex", calorias: 2250, meta: 2000 },
+  { day: "Sáb", calorias: 2380, meta: 2000 },
+  { day: "Dom", calorias: 1985, meta: 2000 },
 ];
 
 export const macroBreakdown = [
   { name: "Proteínas", value: 25, atual: 145, meta: 150, color: "#f4623a" },
   { name: "Gorduras", value: 45, atual: 65, meta: 70, color: "#f9c9b8" },
   { name: "Carboidratos", value: 30, atual: 220, meta: 250, color: "#7fc1e8" },
+];
+
+export const otherMacros = [
+  { name: "Fibras", atual: 22, meta: 30, unit: "g" },
+  { name: "Açúcares", atual: 38, meta: 50, unit: "g" },
+  { name: "Gordura saturada", atual: 16, meta: 20, unit: "g" },
+  { name: "Colesterol", atual: 210, meta: 300, unit: "mg" },
+];
+
+export const vitamins = [
+  { name: "Vitamina A", atual: 620, meta: 900, unit: "µg" },
+  { name: "Vitamina B12", atual: 2.1, meta: 2.4, unit: "µg" },
+  { name: "Vitamina C", atual: 95, meta: 90, unit: "mg" },
+  { name: "Vitamina D", atual: 8, meta: 15, unit: "µg" },
+  { name: "Vitamina E", atual: 11, meta: 15, unit: "mg" },
+  { name: "Vitamina K", atual: 110, meta: 120, unit: "µg" },
+  { name: "Ácido fólico (B9)", atual: 310, meta: 400, unit: "µg" },
+];
+
+export const minerals = [
+  { name: "Cálcio", atual: 780, meta: 1000, unit: "mg" },
+  { name: "Ferro", atual: 12, meta: 8, unit: "mg" },
+  { name: "Magnésio", atual: 290, meta: 420, unit: "mg" },
+  { name: "Potássio", atual: 2900, meta: 3400, unit: "mg" },
+  { name: "Sódio", atual: 1800, meta: 2000, unit: "mg" },
+  { name: "Zinco", atual: 9, meta: 11, unit: "mg" },
+  { name: "Selênio", atual: 48, meta: 55, unit: "µg" },
 ];
 
 export const mealCategories = ["Todos", "Café da Manhã", "Almoço", "Lanche", "Jantar"] as const;
@@ -90,5 +121,100 @@ export const mealPlan = [
       { name: "Cenoura", quantity: "50 g", carbs: 5, protein: 1, fat: 0, kcal: 20 },
       { name: "Azeite de oliva", quantity: "1 colher de chá", carbs: 0, protein: 0, fat: 5, kcal: 40 },
     ],
+  },
+];
+
+// Histórico: 90 dias até HISTORY_END, no formato em que viriam do Google Fit / Apple Saúde
+// (atividade) somado ao consumo registrado no plano alimentar. Datas fixas para manter
+// o render estático determinístico.
+export const HISTORY_END = "2026-09-21";
+
+function seeded(n: number) {
+  const x = Math.sin(n * 9301 + 49297) * 233280;
+  return x - Math.floor(x);
+}
+
+export const activityHistory = Array.from({ length: 90 }, (_, i) => {
+  const date = new Date(`${HISTORY_END}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - (89 - i));
+  const weekend = date.getUTCDay() === 0 || date.getUTCDay() === 6;
+
+  const steps = Math.round(5500 + seeded(i) * 6500 - (weekend ? 1500 : 0));
+  const activeCalories = Math.round(steps * 0.04 + seeded(i + 100) * 180);
+
+  return {
+    date: date.toISOString().slice(0, 10),
+    consumed: Math.round(1800 + seeded(i + 300) * 450 + (weekend ? 150 : 0)),
+    burned: 1650 + activeCalories,
+    activeCalories,
+    steps,
+    activeMinutes: Math.round(steps / 150 + seeded(i + 200) * 20),
+    distanceKm: Math.round(steps * 0.00075 * 10) / 10,
+    source: "Google Fit" as const,
+  };
+});
+
+export const activitySources = [
+  { name: "Google Fit", platform: "Android", connected: true, lastSync: "21/09/2026 às 22:14" },
+  { name: "Apple Saúde", platform: "iOS", connected: false, lastSync: null },
+];
+
+export const planHistory: {
+  date: string;
+  meals: { category: string; title: string; kcal: number; followed: boolean }[];
+  flaggedFoods: { name: string; feedback: FoodFeedback }[];
+}[] = [
+  {
+    date: "2026-09-21",
+    meals: [
+      { category: "Café da Manhã", title: "Torrada de Abacate com Ovo Poché", kcal: 350, followed: true },
+      { category: "Almoço", title: "Tacos de Camarão Grelhado com Salsa de Manga", kcal: 375, followed: true },
+      { category: "Lanche", title: "Iogurte Grego com Frutas Vermelhas", kcal: 180, followed: false },
+      { category: "Jantar", title: "Bowl de Salmão com Quinoa e Legumes", kcal: 435, followed: true },
+    ],
+    flaggedFoods: [{ name: "Guacamole", feedback: "nao-quero" }],
+  },
+  {
+    date: "2026-09-20",
+    meals: [
+      { category: "Café da Manhã", title: "Panqueca de Aveia com Banana", kcal: 380, followed: true },
+      { category: "Almoço", title: "Frango Grelhado com Arroz Integral", kcal: 520, followed: true },
+      { category: "Lanche", title: "Mix de Castanhas", kcal: 190, followed: true },
+      { category: "Jantar", title: "Omelete de Espinafre com Salada", kcal: 340, followed: true },
+    ],
+    flaggedFoods: [],
+  },
+  {
+    date: "2026-09-19",
+    meals: [
+      { category: "Café da Manhã", title: "Vitamina de Morango com Whey", kcal: 310, followed: true },
+      { category: "Almoço", title: "Peixe Assado com Batata-Doce", kcal: 480, followed: false },
+      { category: "Lanche", title: "Maçã com Pasta de Amendoim", kcal: 210, followed: true },
+      { category: "Jantar", title: "Sopa de Legumes com Frango", kcal: 360, followed: false },
+    ],
+    flaggedFoods: [
+      { name: "Batata-doce", feedback: "nao-tenho" },
+      { name: "Chuchu", feedback: "nao-gosto" },
+    ],
+  },
+  {
+    date: "2026-09-18",
+    meals: [
+      { category: "Café da Manhã", title: "Tapioca com Queijo Branco", kcal: 330, followed: true },
+      { category: "Almoço", title: "Carne Moída com Abobrinha e Arroz", kcal: 540, followed: true },
+      { category: "Lanche", title: "Iogurte Natural com Granola", kcal: 220, followed: true },
+      { category: "Jantar", title: "Wrap de Atum com Folhas", kcal: 390, followed: false },
+    ],
+    flaggedFoods: [{ name: "Atum em lata", feedback: "nao-gosto" }],
+  },
+  {
+    date: "2026-09-17",
+    meals: [
+      { category: "Café da Manhã", title: "Ovos Mexidos com Pão Integral", kcal: 360, followed: true },
+      { category: "Almoço", title: "Strogonoff de Frango Light", kcal: 510, followed: true },
+      { category: "Lanche", title: "Banana com Aveia", kcal: 170, followed: true },
+      { category: "Jantar", title: "Salada de Grão-de-Bico", kcal: 380, followed: true },
+    ],
+    flaggedFoods: [],
   },
 ];

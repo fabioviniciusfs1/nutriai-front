@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Flame, Wheat, Drumstick, Droplet, SlidersHorizontal, ChevronDown } from "lucide-react";
+import { Flame, Wheat, Drumstick, Droplet } from "lucide-react";
 import { mealCategories, mealPlan } from "@/lib/mock-data";
+import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
+import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 
 function sumTotals(foods: (typeof mealPlan)[number]["foods"]) {
   return foods.reduce(
@@ -19,6 +21,28 @@ function sumTotals(foods: (typeof mealPlan)[number]["foods"]) {
 
 export function MealPlan() {
   const [category, setCategory] = useState<(typeof mealCategories)[number]>("Todos");
+  const [feedback, setFeedback] = useState<Record<string, FoodFeedback>>({});
+
+  const [pending, setPending] = useState<{
+    foodKey: string;
+    foodName: string;
+    value: FoodFeedback;
+  } | null>(null);
+
+  function confirmFeedback() {
+    if (!pending) return;
+    const { foodKey, value } = pending;
+    setFeedback((current) => {
+      const next = { ...current };
+      if (next[foodKey] === value) delete next[foodKey];
+      else next[foodKey] = value;
+      return next;
+    });
+    setPending(null);
+  }
+
+  const pendingLabel = FOOD_FEEDBACK.find((item) => item.id === pending?.value)?.label;
+  const pendingIsRemoval = pending !== null && feedback[pending.foodKey] === pending.value;
 
   const meals = mealPlan.filter(
     (meal) => category === "Todos" || meal.category === category
@@ -26,23 +50,7 @@ export function MealPlan() {
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-semibold text-neutral-900">Plano Alimentar</h3>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600"
-          >
-            <SlidersHorizontal size={14} /> Filtrar <ChevronDown size={14} />
-          </button>
-          <button
-            type="button"
-            className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600"
-          >
-            Ordenar por: Calorias <ChevronDown size={14} />
-          </button>
-        </div>
-      </div>
+      <h3 className="font-semibold text-neutral-900">Plano Alimentar</h3>
 
       <div className="mt-4 flex flex-wrap gap-2">
         {mealCategories.map((item) => (
@@ -101,33 +109,92 @@ export function MealPlan() {
                 </div>
               </div>
 
-              <div className="mt-4 overflow-x-auto">
-                <div className="grid min-w-[520px] grid-cols-[2fr_1fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-2 border-b border-neutral-100 pb-2 text-xs font-medium text-neutral-400">
+              <div className="mt-4">
+                <div className="hidden sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] gap-2 border-b border-neutral-100 pb-2 text-xs font-medium text-neutral-400 sm:grid">
                   <span>Alimento</span>
                   <span>Quantidade</span>
                   <span>Carb.</span>
                   <span>Prot.</span>
                   <span>Gord.</span>
                   <span>Kcal</span>
+                  <span className="w-[5.75rem]" aria-hidden />
                 </div>
-                {meal.foods.map((food) => (
-                  <div
-                    key={food.name}
-                    className="grid min-w-[520px] grid-cols-[2fr_1fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-2 border-b border-neutral-50 py-2 text-sm text-neutral-700 last:border-b-0"
-                  >
-                    <span>{food.name}</span>
-                    <span className="text-neutral-500">{food.quantity}</span>
-                    <span>{food.carbs}g</span>
-                    <span>{food.protein}g</span>
-                    <span>{food.fat}g</span>
-                    <span>{food.kcal}</span>
-                  </div>
-                ))}
+                {meal.foods.map((food) => {
+                  const foodKey = `${meal.id}-${food.name}`;
+                  const selected = feedback[foodKey];
+
+                  return (
+                    <div
+                      key={food.name}
+                      className={`grid grid-cols-4 gap-x-2 gap-y-2 border-b border-neutral-100 py-3 text-sm text-neutral-700 last:border-b-0 sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] sm:border-neutral-50 sm:py-2 ${
+                        selected ? "opacity-60" : ""
+                      }`}
+                    >
+                      <span className="col-span-3 font-medium text-neutral-900 sm:col-span-1 sm:font-normal sm:text-neutral-700">
+                        {food.name}
+                      </span>
+                      <span className="text-right text-neutral-500 sm:text-left">{food.quantity}</span>
+                      <span className="flex flex-col sm:block">
+                        <span className="text-xs text-neutral-400 sm:hidden">Carb.</span>
+                        {food.carbs}g
+                      </span>
+                      <span className="flex flex-col sm:block">
+                        <span className="text-xs text-neutral-400 sm:hidden">Prot.</span>
+                        {food.protein}g
+                      </span>
+                      <span className="flex flex-col sm:block">
+                        <span className="text-xs text-neutral-400 sm:hidden">Gord.</span>
+                        {food.fat}g
+                      </span>
+                      <span className="flex flex-col sm:block">
+                        <span className="text-xs text-neutral-400 sm:hidden">Kcal</span>
+                        {food.kcal}
+                      </span>
+                      <div className="col-span-4 flex items-center gap-1 sm:col-span-1">
+                        {FOOD_FEEDBACK.map(({ id, label, Icon }) => (
+                          <button
+                            key={id}
+                            type="button"
+                            title={label}
+                            aria-label={`${label}: ${food.name}`}
+                            aria-pressed={selected === id}
+                            onClick={() => setPending({ foodKey, foodName: food.name, value: id })}
+                            className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                              selected === id
+                                ? "bg-accent text-white"
+                                : "text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+                            }`}
+                          >
+                            <Icon size={15} />
+                          </button>
+                        ))}
+                        {selected && (
+                          <span className="ml-1 text-xs font-medium text-accent sm:hidden">
+                            {FOOD_FEEDBACK.find((item) => item.id === selected)?.label}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </li>
           );
         })}
       </ul>
+
+      <ConfirmDialog
+        open={pending !== null}
+        title={pendingIsRemoval ? "Remover marcação?" : `Marcar como "${pendingLabel}"?`}
+        description={
+          pendingIsRemoval
+            ? `"${pending?.foodName}" deixará de estar marcado como "${pendingLabel}".`
+            : `"${pending?.foodName}" será marcado como "${pendingLabel}" no seu plano alimentar.`
+        }
+        confirmLabel={pendingIsRemoval ? "Remover" : "Confirmar"}
+        onConfirm={confirmFeedback}
+        onCancel={() => setPending(null)}
+      />
     </div>
   );
 }

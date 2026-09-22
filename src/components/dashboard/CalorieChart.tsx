@@ -13,12 +13,14 @@ import {
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { calorieIntake } from "@/lib/mock-data";
 
+const numberFormat = new Intl.NumberFormat("pt-BR");
+
 function CustomTooltip({ active, payload, label }: TooltipContentProps<ValueType, NameType>) {
   if (!active || !payload?.length) return null;
 
   return (
     <div className="rounded-xl bg-neutral-800/95 p-4 text-white shadow-lg">
-      <p className="mb-2 text-xs text-neutral-300">{label} de 2025</p>
+      <p className="mb-2 text-xs text-neutral-300">{label}</p>
       {payload.map((item) => (
         <div key={item.dataKey as string} className="flex items-center gap-2 text-sm">
           <span
@@ -28,7 +30,9 @@ function CustomTooltip({ active, payload, label }: TooltipContentProps<ValueType
           <span className="text-neutral-300">
             {item.dataKey === "calorias" ? "Calorias" : "Meta"}
           </span>
-          <span className="ml-auto font-semibold">{item.value}kg</span>
+          <span className="ml-auto font-semibold">
+            {numberFormat.format(Number(item.value))} kcal
+          </span>
         </div>
       ))}
     </div>
@@ -54,13 +58,13 @@ export function CalorieChart() {
           type="button"
           className="rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600"
         >
-          Mensal
+          Semanal
         </button>
       </div>
 
-      <div className="mt-4 min-h-72 flex-1">
+      <div className="mt-4 h-72">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={calorieIntake} margin={{ left: -20, right: 10 }}>
+          <AreaChart data={calorieIntake} margin={{ left: -8, right: 10 }}>
             <defs>
               <linearGradient id="calorieFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#f4623a" stopOpacity={0.25} />
@@ -73,7 +77,7 @@ export function CalorieChart() {
             </defs>
             <CartesianGrid vertical={false} strokeDasharray="4 6" stroke="#e5e5e5" />
             <XAxis
-              dataKey="month"
+              dataKey="day"
               axisLine={false}
               tickLine={false}
               tick={{ fill: "#a3a3a3", fontSize: 12 }}
@@ -82,8 +86,8 @@ export function CalorieChart() {
               axisLine={false}
               tickLine={false}
               tick={{ fill: "#a3a3a3", fontSize: 12 }}
-              tickFormatter={(v) => `${v} kg`}
-              domain={[55, 90]}
+              tickFormatter={(v) => numberFormat.format(v)}
+              domain={[1500, 2500]}
             />
             <Tooltip content={CustomTooltip} />
             <Area
@@ -91,6 +95,7 @@ export function CalorieChart() {
               dataKey="meta"
               stroke="#e9b949"
               strokeWidth={2}
+              isAnimationActive={false}
               fill="url(#metaFill)"
             />
             <Area
@@ -98,6 +103,7 @@ export function CalorieChart() {
               dataKey="calorias"
               stroke="#f4623a"
               strokeWidth={2}
+              isAnimationActive={false}
               fill="url(#calorieFill)"
             />
           </AreaChart>
