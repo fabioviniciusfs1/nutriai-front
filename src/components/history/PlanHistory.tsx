@@ -39,7 +39,7 @@ export function PlanHistory() {
                   <ul className="flex flex-col">
                     {plan.meals.map((meal) => (
                       <li
-                        key={meal.category}
+                        key={meal.time}
                         className="flex items-center gap-3 border-b border-neutral-50 py-2.5 text-sm last:border-b-0"
                       >
                         <span
@@ -51,7 +51,7 @@ export function PlanHistory() {
                           {meal.followed ? <Check size={14} /> : <X size={14} />}
                         </span>
                         <span className="flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
-                          <span className="text-xs text-neutral-400 sm:w-28">{meal.category}</span>
+                          <span className="text-xs text-neutral-400 sm:w-12">{meal.time}</span>
                           <span className={meal.followed ? "text-neutral-800" : "text-neutral-400 line-through"}>
                             {meal.title}
                           </span>

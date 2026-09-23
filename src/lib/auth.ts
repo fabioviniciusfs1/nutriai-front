@@ -11,11 +11,14 @@ type StoredUser = {
   username: string;
   passwordHash: string;
   profile: Profile | null;
+  /** Horário escolhido pelo usuário para cada refeição do plano (id da refeição → "HH:MM"). */
+  mealTimes?: Record<number, string>;
 };
 
 export type AuthState = {
   user: { name: string; username: string } | null;
   profile: Profile | null;
+  mealTimes: Record<number, string>;
 };
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -117,6 +120,14 @@ export function saveProfile(profile: Profile) {
   writeUsers(users);
 }
 
+export function saveMealTime(mealId: number, time: string) {
+  const username = readStorage(SESSION_KEY);
+  const users = readUsers();
+  if (!username || !users[username]) return;
+  users[username] = { ...users[username], mealTimes: { ...users[username].mealTimes, [mealId]: time } };
+  writeUsers(users);
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   // Mantém abas diferentes sincronizadas (login/logout em outra aba).
@@ -128,7 +139,7 @@ function subscribe(listener: () => void) {
 }
 
 let cachedKey: string | undefined;
-let cachedState: AuthState = { user: null, profile: null };
+let cachedState: AuthState = { user: null, profile: null, mealTimes: {} };
 
 function getSnapshot(): AuthState {
   const usersRaw = readStorage(USERS_KEY);
@@ -139,8 +150,8 @@ function getSnapshot(): AuthState {
   const user = session ? readUsers()[session] : undefined;
   cachedKey = key;
   cachedState = user
-    ? { user: { name: user.name, username: user.username }, profile: user.profile }
-    : { user: null, profile: null };
+    ? { user: { name: user.name, username: user.username }, profile: user.profile, mealTimes: user.mealTimes ?? {} }
+    : { user: null, profile: null, mealTimes: {} };
   return cachedState;
 }
 

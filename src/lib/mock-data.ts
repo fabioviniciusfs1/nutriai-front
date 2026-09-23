@@ -33,7 +33,6 @@ export const minerals = [
   { name: "Selênio", atual: 48, meta: 55, unit: "µg" },
 ];
 
-export const mealCategories = ["Todos", "Café da Manhã", "Almoço", "Lanche", "Jantar"] as const;
 
 export const initialChatMessages = [
   {
@@ -70,9 +69,7 @@ export const mealPlan = [
   {
     id: 1,
     title: "Torrada de Abacate com Ovo Poché",
-    category: "Café da Manhã",
-    image:
-      "https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?auto=format&fit=crop&w=200&h=200&q=70",
+    time: "07:30",
     foods: [
       { name: "Pão integral", quantity: "2 fatias", carbs: 24, protein: 6, fat: 2, kcal: 140 },
       { name: "Abacate", quantity: "50 g", carbs: 4, protein: 1, fat: 10, kcal: 100 },
@@ -83,9 +80,7 @@ export const mealPlan = [
   {
     id: 2,
     title: "Tacos de Camarão Grelhado com Salsa de Manga",
-    category: "Almoço",
-    image:
-      "https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=200&h=200&q=70",
+    time: "12:30",
     foods: [
       { name: "Tortilha integral", quantity: "2 unidades", carbs: 22, protein: 5, fat: 3, kcal: 130 },
       { name: "Camarão grelhado", quantity: "120 g", carbs: 0, protein: 20, fat: 2, kcal: 110 },
@@ -97,9 +92,7 @@ export const mealPlan = [
   {
     id: 3,
     title: "Bowl de Salmão com Quinoa e Legumes",
-    category: "Jantar",
-    image:
-      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=200&h=200&q=70",
+    time: "20:00",
     foods: [
       { name: "Salmão grelhado", quantity: "130 g", carbs: 0, protein: 26, fat: 12, kcal: 220 },
       { name: "Quinoa cozida", quantity: "100 g", carbs: 21, protein: 4, fat: 2, kcal: 120 },
@@ -147,36 +140,36 @@ export const activitySources = [
 
 export const planHistory: {
   date: string;
-  meals: { category: string; title: string; kcal: number; followed: boolean }[];
+  meals: { time: string; title: string; kcal: number; followed: boolean }[];
   flaggedFoods: { name: string; feedback: FoodFeedback }[];
 }[] = [
   {
     date: "2026-09-21",
     meals: [
-      { category: "Café da Manhã", title: "Torrada de Abacate com Ovo Poché", kcal: 350, followed: true },
-      { category: "Almoço", title: "Tacos de Camarão Grelhado com Salsa de Manga", kcal: 375, followed: true },
-      { category: "Lanche", title: "Iogurte Grego com Frutas Vermelhas", kcal: 180, followed: false },
-      { category: "Jantar", title: "Bowl de Salmão com Quinoa e Legumes", kcal: 435, followed: true },
+      { time: "07:30", title: "Torrada de Abacate com Ovo Poché", kcal: 350, followed: true },
+      { time: "12:30", title: "Tacos de Camarão Grelhado com Salsa de Manga", kcal: 375, followed: true },
+      { time: "16:00", title: "Iogurte Grego com Frutas Vermelhas", kcal: 180, followed: false },
+      { time: "20:00", title: "Bowl de Salmão com Quinoa e Legumes", kcal: 435, followed: true },
     ],
     flaggedFoods: [{ name: "Guacamole", feedback: "nao-quero" }],
   },
   {
     date: "2026-09-20",
     meals: [
-      { category: "Café da Manhã", title: "Panqueca de Aveia com Banana", kcal: 380, followed: true },
-      { category: "Almoço", title: "Frango Grelhado com Arroz Integral", kcal: 520, followed: true },
-      { category: "Lanche", title: "Mix de Castanhas", kcal: 190, followed: true },
-      { category: "Jantar", title: "Omelete de Espinafre com Salada", kcal: 340, followed: true },
+      { time: "07:30", title: "Panqueca de Aveia com Banana", kcal: 380, followed: true },
+      { time: "12:30", title: "Frango Grelhado com Arroz Integral", kcal: 520, followed: true },
+      { time: "16:00", title: "Mix de Castanhas", kcal: 190, followed: true },
+      { time: "20:00", title: "Omelete de Espinafre com Salada", kcal: 340, followed: true },
     ],
     flaggedFoods: [],
   },
   {
     date: "2026-09-19",
     meals: [
-      { category: "Café da Manhã", title: "Vitamina de Morango com Whey", kcal: 310, followed: true },
-      { category: "Almoço", title: "Peixe Assado com Batata-Doce", kcal: 480, followed: false },
-      { category: "Lanche", title: "Maçã com Pasta de Amendoim", kcal: 210, followed: true },
-      { category: "Jantar", title: "Sopa de Legumes com Frango", kcal: 360, followed: false },
+      { time: "07:30", title: "Vitamina de Morango com Whey", kcal: 310, followed: true },
+      { time: "12:30", title: "Peixe Assado com Batata-Doce", kcal: 480, followed: false },
+      { time: "16:00", title: "Maçã com Pasta de Amendoim", kcal: 210, followed: true },
+      { time: "20:00", title: "Sopa de Legumes com Frango", kcal: 360, followed: false },
     ],
     flaggedFoods: [
       { name: "Batata-doce", feedback: "nao-tenho" },
@@ -186,20 +179,20 @@ export const planHistory: {
   {
     date: "2026-09-18",
     meals: [
-      { category: "Café da Manhã", title: "Tapioca com Queijo Branco", kcal: 330, followed: true },
-      { category: "Almoço", title: "Carne Moída com Abobrinha e Arroz", kcal: 540, followed: true },
-      { category: "Lanche", title: "Iogurte Natural com Granola", kcal: 220, followed: true },
-      { category: "Jantar", title: "Wrap de Atum com Folhas", kcal: 390, followed: false },
+      { time: "07:30", title: "Tapioca com Queijo Branco", kcal: 330, followed: true },
+      { time: "12:30", title: "Carne Moída com Abobrinha e Arroz", kcal: 540, followed: true },
+      { time: "16:00", title: "Iogurte Natural com Granola", kcal: 220, followed: true },
+      { time: "20:00", title: "Wrap de Atum com Folhas", kcal: 390, followed: false },
     ],
     flaggedFoods: [{ name: "Atum em lata", feedback: "nao-gosto" }],
   },
   {
     date: "2026-09-17",
     meals: [
-      { category: "Café da Manhã", title: "Ovos Mexidos com Pão Integral", kcal: 360, followed: true },
-      { category: "Almoço", title: "Strogonoff de Frango Light", kcal: 510, followed: true },
-      { category: "Lanche", title: "Banana com Aveia", kcal: 170, followed: true },
-      { category: "Jantar", title: "Salada de Grão-de-Bico", kcal: 380, followed: true },
+      { time: "07:30", title: "Ovos Mexidos com Pão Integral", kcal: 360, followed: true },
+      { time: "12:30", title: "Strogonoff de Frango Light", kcal: 510, followed: true },
+      { time: "16:00", title: "Banana com Aveia", kcal: 170, followed: true },
+      { time: "20:00", title: "Salada de Grão-de-Bico", kcal: 380, followed: true },
     ],
     flaggedFoods: [],
   },
