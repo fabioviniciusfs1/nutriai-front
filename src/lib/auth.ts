@@ -2,6 +2,8 @@
 // NÃO é segura — serve só para prototipar o fluxo até existir um backend.
 import { useSyncExternalStore } from "react";
 import type { Profile } from "@/lib/calorie-target";
+import type { FoodFeedback } from "@/lib/food-feedback";
+import type { mealPlan } from "@/lib/mock-data";
 
 const USERS_KEY = "nutriai:users";
 const SESSION_KEY = "nutriai:session";
@@ -14,6 +16,40 @@ export type WeightEntry = {
   kg: number;
 };
 
+/** Mudanças no plano feitas pelo usuário num dia (remover/trocar/redistribuir refeições). */
+export type DayPlanChanges = {
+  removed: number[];
+  replacements: Record<number, { title: string; foods: (typeof mealPlan)[number]["foods"] }>;
+  /**
+   * Fator das porções de cada refeição do dia (id → fator). Ao criar uma refeição, as outras são
+   * reduzidas na mesma proporção para abrir espaço para ela; ao remover com "redistribuir", as
+   * seguintes aumentam para receber as calorias. Em ambos os casos o total do dia não aumenta.
+   */
+  scales: Record<number, number>;
+  /** Refeições criadas pelo usuário: nome e horário dele, alimentos sugeridos pelo sistema. */
+  added: {
+    id: number;
+    title: string;
+    time: string;
+    /** Nome da sugestão de onde vieram os alimentos. */
+    suggestion: string;
+    foods: (typeof mealPlan)[number]["foods"];
+  }[];
+};
+
+export const EMPTY_DAY_PLAN: DayPlanChanges = {
+  removed: [],
+  replacements: {},
+  scales: {},
+  added: [],
+};
+
+/** Data local "AAAA-MM-DD": as mudanças do plano valem só para o dia em que foram feitas. */
+function today() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 type StoredUser = {
   name: string;
   username: string;
@@ -22,6 +58,24 @@ type StoredUser = {
   /** Horário escolhido pelo usuário para cada refeição do plano (id da refeição → "HH:MM"). */
   mealTimes?: Record<number, string>;
   weights?: WeightEntry[];
+  /** Mudanças do plano de um dia; em outro dia são ignoradas e o plano base volta. */
+  dayPlan?: { date: string; changes: DayPlanChanges };
+  /**
+   * Alimentos restritos ("Não gosto / Não quero / Não tenho"): o assistente não os recomenda até o
+   * usuário liberar na página Alimentos. Liberar não desfaz trocas já feitas.
+   */
+  foodFeedback?: Record<string, FoodFeedback>;
+  /**
+   * Trocas permanentes de "Não gosto" e "Não tenho" em todas as refeições (nome → substituto;
+   * "" = sai sem substituto). Continuam valendo mesmo depois de o alimento ser liberado.
+   */
+  foodSubstitutes?: Record<string, string>;
+  /**
+   * Trocas permanentes de "Não quero", só na refeição marcada (id da refeição → alimento →
+   * substituto; "" = sai sem substituto). Ex.: um alimento que aparece em 3 refeições e é marcado
+   * em uma passa a ser comido 2 vezes por dia, todos os dias.
+   */
+  mealFoodSwaps?: Record<number, Record<string, string>>;
 };
 
 export type AuthState = {
@@ -30,6 +84,11 @@ export type AuthState = {
   mealTimes: Record<number, string>;
   /** Ordenados do mais antigo para o mais recente. */
   weights: WeightEntry[];
+  /** Mudanças do plano de hoje (vazio se não houver ou se forem de outro dia). */
+  dayPlan: DayPlanChanges;
+  foodFeedback: Record<string, FoodFeedback>;
+  foodSubstitutes: Record<string, string>;
+  mealFoodSwaps: Record<number, Record<string, string>>;
 };
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -148,6 +207,59 @@ export function addWeightEntry(kg: number, at: Date) {
   writeUsers(users);
 }
 
+export function saveDayPlanChanges(changes: DayPlanChanges) {
+  const username = readStorage(SESSION_KEY);
+  const users = readUsers();
+  if (!username || !users[username]) return;
+  users[username] = { ...users[username], dayPlan: { date: today(), changes } };
+  writeUsers(users);
+}
+
+function updateUser(update: (user: StoredUser) => StoredUser) {
+  const username = readStorage(SESSION_KEY);
+  const users = readUsers();
+  if (!username || !users[username]) return;
+  users[username] = update(users[username]);
+  writeUsers(users);
+}
+
+/**
+ * "Não gosto" / "Não tenho": o alimento é trocado por `substitute` em todas as refeições, de forma
+ * permanente (`null` = sai sem substituto), e fica restrito para o assistente.
+ */
+export function markFoodEverywhere(foodName: string, value: FoodFeedback, substitute: string | null) {
+  updateUser((user) => ({
+    ...user,
+    foodFeedback: { ...user.foodFeedback, [foodName]: value },
+    foodSubstitutes: { ...user.foodSubstitutes, [foodName]: substitute ?? "" },
+  }));
+}
+
+/**
+ * "Não quero": troca o alimento só na refeição `mealId`, de forma permanente (as outras refeições
+ * continuam com ele). O alimento fica restrito para o assistente, sem sobrescrever uma marcação
+ * "Não gosto"/"Não tenho" que já exista.
+ */
+export function markFoodInMeal(mealId: number, foodName: string, substitute: string | null) {
+  updateUser((user) => ({
+    ...user,
+    foodFeedback: { ...user.foodFeedback, [foodName]: user.foodFeedback?.[foodName] ?? "nao-quero" },
+    mealFoodSwaps: {
+      ...user.mealFoodSwaps,
+      [mealId]: { ...user.mealFoodSwaps?.[mealId], [foodName]: substitute ?? "" },
+    },
+  }));
+}
+
+/** Libera o alimento para o assistente voltar a recomendá-lo. Trocas já feitas continuam. */
+export function releaseFood(foodName: string) {
+  updateUser((user) => {
+    const foodFeedback = { ...user.foodFeedback };
+    delete foodFeedback[foodName];
+    return { ...user, foodFeedback };
+  });
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   // Mantém abas diferentes sincronizadas (login/logout em outra aba).
@@ -159,12 +271,24 @@ function subscribe(listener: () => void) {
 }
 
 let cachedKey: string | undefined;
-let cachedState: AuthState = { user: null, profile: null, mealTimes: {}, weights: [] };
+const SIGNED_OUT: AuthState = {
+  user: null,
+  profile: null,
+  mealTimes: {},
+  weights: [],
+  dayPlan: EMPTY_DAY_PLAN,
+  foodFeedback: {},
+  foodSubstitutes: {},
+  mealFoodSwaps: {},
+};
+
+let cachedState: AuthState = SIGNED_OUT;
 
 function getSnapshot(): AuthState {
   const usersRaw = readStorage(USERS_KEY);
   const session = readStorage(SESSION_KEY);
-  const key = `${session}|${usersRaw}`;
+  // A data entra na chave para o plano voltar ao base quando o dia vira.
+  const key = `${session}|${today()}|${usersRaw}`;
   if (key === cachedKey) return cachedState;
 
   const user = session ? readUsers()[session] : undefined;
@@ -175,8 +299,13 @@ function getSnapshot(): AuthState {
         profile: user.profile,
         mealTimes: user.mealTimes ?? {},
         weights: [...(user.weights ?? [])].sort((a, b) => a.at.localeCompare(b.at)),
+        // Mescla com o vazio: planos salvos antes de um campo existir (ex.: `added`) continuam válidos.
+        dayPlan: user.dayPlan?.date === today() ? { ...EMPTY_DAY_PLAN, ...user.dayPlan.changes } : EMPTY_DAY_PLAN,
+        foodFeedback: user.foodFeedback ?? {},
+        foodSubstitutes: user.foodSubstitutes ?? {},
+        mealFoodSwaps: user.mealFoodSwaps ?? {},
       }
-    : { user: null, profile: null, mealTimes: {}, weights: [] };
+    : SIGNED_OUT;
   return cachedState;
 }
 

@@ -5,11 +5,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { getInitials, signOut, useAuth } from "@/lib/auth";
 
-const NAV_ITEMS = [
+const NAV_ITEMS: { label: string; shortLabel?: string; href: string }[] = [
   { label: "Início", href: "/" },
   { label: "Nutrientes", href: "/nutrientes" },
+  { label: "Alimentos", href: "/alimentos" },
   { label: "Histórico", href: "/historico" },
-  { label: "Chat com IA", href: "/chat" },
+  // No celular, com 5 itens, só "Chat" cabe na coluna.
+  { label: "Chat com IA", shortLabel: "Chat", href: "/chat" },
 ];
 
 export function Topbar() {
@@ -28,18 +30,25 @@ export function Topbar() {
         <span className="text-xl">🌱</span>
       </div>
 
-      <nav className="order-last grid w-full grid-cols-4 gap-1 md:order-none md:flex md:w-auto md:flex-1 md:items-center md:gap-2">
+      <nav className="order-last grid w-full grid-cols-5 gap-1 md:order-none md:flex md:w-auto md:flex-1 md:items-center md:gap-2">
         {NAV_ITEMS.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className={`whitespace-nowrap rounded-full px-2 py-2 text-center text-xs font-medium transition-colors sm:text-sm md:px-4 ${
+            className={`whitespace-nowrap rounded-full px-1 py-2 text-center text-xs font-medium transition-colors sm:text-sm md:px-4 ${
               pathname === item.href
                 ? "bg-accent text-white"
                 : "text-neutral-600 hover:bg-neutral-100"
             }`}
           >
-            {item.label}
+            {item.shortLabel ? (
+              <>
+                <span className="sm:hidden">{item.shortLabel}</span>
+                <span className="hidden sm:inline">{item.label}</span>
+              </>
+            ) : (
+              item.label
+            )}
           </Link>
         ))}
       </nav>
