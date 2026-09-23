@@ -1,0 +1,19 @@
+// Deploy no Cloudflare Workers como site estático (sem código de servidor): `npm run build:cloudflare`
+// gera `out/` com uma página HTML por rota, e o Workers serve esses arquivos.
+{
+  // Precisa ser o mesmo nome do Worker criado no painel do Cloudflare.
+  "name": "nutriai-front",
+  "compatibility_date": "2026-09-23",
+  // Roda antes de `wrangler deploy` / `wrangler preview`, garantindo que `out/` seja o export estático.
+  "build": {
+    "command": "npm run build:cloudflare"
+  },
+  "assets": {
+    "directory": "./out",
+    // /alimentos → alimentos.html; rota desconhecida → 404.html.
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  // Exigido por `wrangler preview` (deploys de branches que não são a principal).
+  "previews": {}
+}
