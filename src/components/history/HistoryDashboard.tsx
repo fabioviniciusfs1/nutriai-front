@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { activityHistory } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth";
+import { calculateCalorieTarget } from "@/lib/calorie-target";
 import { StatTile } from "@/components/history/StatTile";
 import { BalanceChart } from "@/components/history/BalanceChart";
 import { ActivityPanel } from "@/components/history/ActivityPanel";
 import { formatSigned, numberFormat } from "@/components/history/format";
 
 const PERIODS = [7, 30, 90] as const;
-const CALORIE_GOAL = 2000;
 // Um dia conta como "dentro da meta" quando o consumo fica a até 150 kcal da meta.
 const GOAL_TOLERANCE = 150;
 
@@ -18,12 +19,14 @@ function average(values: number[]) {
 
 export function HistoryDashboard() {
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>(30);
+  const profile = useAuth()?.profile;
+  const calorieGoal = profile ? calculateCalorieTarget(profile).target : 2000;
 
   const days = activityHistory.slice(-period);
   const avgConsumed = average(days.map((d) => d.consumed));
   const avgBurned = average(days.map((d) => d.burned));
   const avgBalance = avgConsumed - avgBurned;
-  const daysOnGoal = days.filter((d) => Math.abs(d.consumed - CALORIE_GOAL) <= GOAL_TOLERANCE).length;
+  const daysOnGoal = days.filter((d) => Math.abs(d.consumed - calorieGoal) <= GOAL_TOLERANCE).length;
 
   return (
     <>
@@ -58,11 +61,11 @@ export function HistoryDashboard() {
         <StatTile
           label="Dias dentro da meta"
           value={`${daysOnGoal}/${days.length}`}
-          hint={`Até ${GOAL_TOLERANCE} kcal da meta de ${numberFormat.format(CALORIE_GOAL)}`}
+          hint={`Até ${GOAL_TOLERANCE} kcal da meta de ${numberFormat.format(calorieGoal)}`}
         />
       </div>
 
-      <BalanceChart days={days} goal={CALORIE_GOAL} />
+      <BalanceChart days={days} goal={calorieGoal} />
       <ActivityPanel days={days} />
     </>
   );

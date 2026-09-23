@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { Send, Sparkles } from "lucide-react";
 import { chatFallbackReplies, chatSuggestions, initialChatMessages } from "@/lib/mock-data";
+import { getInitials, useAuth } from "@/lib/auth";
 
 type Message = {
   id: number;
@@ -14,6 +14,8 @@ type Message = {
 export function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>(initialChatMessages);
   const [input, setInput] = useState("");
+  const userName = useAuth()?.user?.name ?? "";
+  const firstName = userName.split(" ")[0];
 
   function sendMessage(text: string) {
     const trimmed = text.trim();
@@ -58,13 +60,12 @@ export function ChatPanel() {
                   <Sparkles size={14} />
                 </div>
               ) : (
-                <Image
-                  src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=64&h=64&q=70"
-                  alt="Foto de perfil de Masud A."
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 shrink-0 rounded-full object-cover"
-                />
+                <span
+                  aria-hidden
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-white"
+                >
+                  {getInitials(userName)}
+                </span>
               )}
               <div
                 className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
@@ -73,7 +74,7 @@ export function ChatPanel() {
                     : "bg-neutral-100 text-neutral-700"
                 }`}
               >
-                {message.text}
+                {message.text.replace("{nome}", firstName)}
               </div>
             </div>
           ))}

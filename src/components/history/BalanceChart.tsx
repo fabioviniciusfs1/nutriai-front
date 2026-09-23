@@ -85,7 +85,11 @@ export function BalanceChart({ days, goal }: BalanceChartProps) {
               tickLine={false}
               tick={{ fill: "#a3a3a3", fontSize: 12 }}
               tickFormatter={(v) => numberFormat.format(v)}
-              domain={[1500, 2700]}
+              // Sempre inclui a meta (que vem do perfil) e arredonda para centenas.
+              domain={[
+                (min: number) => Math.floor((Math.min(min, goal) - 150) / 100) * 100,
+                (max: number) => Math.ceil((Math.max(max, goal) + 150) / 100) * 100,
+              ]}
             />
             <Tooltip content={BalanceTooltip} cursor={{ stroke: "#d4d4d4" }} />
             <ReferenceLine y={goal} stroke="#a3a3a3" strokeDasharray="6 4" />

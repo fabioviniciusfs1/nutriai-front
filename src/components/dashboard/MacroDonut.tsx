@@ -2,7 +2,9 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, type PieLabelRenderProps } from "recharts";
 import { MoreHorizontal, GlassWater } from "lucide-react";
-import { dailyCalorieGoal, dailyWaterGoal, macroBreakdown } from "@/lib/mock-data";
+import { macroBreakdown } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth";
+import { calculateCalorieTarget, calculateWaterLiters } from "@/lib/calorie-target";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
 
 const RADIAN = Math.PI / 180;
@@ -31,11 +33,17 @@ function renderInsideLabel({ cx, cy, midAngle, innerRadius, outerRadius, value }
   );
 }
 
+const numberFormat = new Intl.NumberFormat("pt-BR");
+
 export function MacroDonut() {
+  const profile = useAuth()?.profile;
+  const calorieGoal = profile ? `${numberFormat.format(calculateCalorieTarget(profile).target)} kcal` : "—";
+  const waterGoal = profile ? `${numberFormat.format(calculateWaterLiters(profile.weightKg))} L` : "—";
+
   return (
     <div className="flex h-full flex-col rounded-2xl bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-neutral-900">Meta diária: {dailyCalorieGoal}</h3>
+        <h3 className="font-semibold text-neutral-900">Meta diária: {calorieGoal}</h3>
         <button
           type="button"
           aria-label="Mais opções"
@@ -86,7 +94,7 @@ export function MacroDonut() {
           <div className="mt-1 flex items-center gap-2 border-t border-neutral-100 pt-3 text-sm">
             <GlassWater size={16} className="text-[#7fc1e8]" />
             <span className="text-neutral-700">Água</span>
-            <span className="ml-auto font-semibold text-neutral-900">{dailyWaterGoal}</span>
+            <span className="ml-auto font-semibold text-neutral-900">{waterGoal}</span>
           </div>
         </div>
       </div>

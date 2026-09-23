@@ -1,5 +1,5 @@
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import { Topbar } from "@/components/dashboard/Topbar";
-import { CalorieChart } from "@/components/dashboard/CalorieChart";
 import { NutrientCard } from "@/components/nutrition/NutrientCard";
 import { macroBreakdown, minerals, otherMacros, vitamins } from "@/lib/mock-data";
 
@@ -16,30 +16,30 @@ const macros = [
 
 export default function NutrientesPage() {
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <Topbar />
+    <AuthGuard>
+      <div className="min-h-screen bg-background p-4 sm:p-6">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4">
+          <Topbar />
 
-        <CalorieChart />
-
-        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <NutrientCard
-            title="Macronutrientes"
-            description="Consumo de hoje em relação à meta diária"
-            nutrients={macros}
-          />
-          <NutrientCard
-            title="Vitaminas"
-            description="Ingestão diária recomendada"
-            nutrients={vitamins}
-          />
-          <NutrientCard
-            title="Minerais"
-            description="Ingestão diária recomendada"
-            nutrients={minerals}
-          />
+          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <NutrientCard
+              title="Macronutrientes"
+              description="Consumo de hoje em relação à meta diária"
+              nutrients={macros}
+            />
+            <NutrientCard
+              title="Vitaminas"
+              description="Ingestão diária recomendada"
+              nutrients={vitamins}
+            />
+            <NutrientCard
+              title="Minerais"
+              description="Ingestão diária recomendada"
+              nutrients={minerals}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 }

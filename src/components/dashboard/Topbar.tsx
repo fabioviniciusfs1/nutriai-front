@@ -1,8 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
+import { getInitials, signOut, useAuth } from "@/lib/auth";
 
 const NAV_ITEMS = [
   { label: "Início", href: "/" },
@@ -13,6 +14,13 @@ const NAV_ITEMS = [
 
 export function Topbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const name = useAuth()?.user?.name ?? "";
+
+  function handleSignOut() {
+    signOut();
+    router.replace("/login");
+  }
 
   return (
     <header className="flex flex-wrap items-center gap-4 rounded-2xl bg-white px-4 py-3 shadow-sm">
@@ -36,15 +44,32 @@ export function Topbar() {
         ))}
       </nav>
 
-      <div className="ml-auto flex items-center gap-2 md:ml-0">
-        <Image
-          src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=80&h=80&q=70"
-          alt="Foto de perfil de Masud A."
-          width={40}
-          height={40}
-          className="h-10 w-10 rounded-full object-cover"
-        />
-        <p className="hidden text-sm font-semibold sm:block">Masud A.</p>
+      <div className="ml-auto flex items-center gap-1 md:ml-0">
+        <Link
+          href="/perfil"
+          title="Meu perfil"
+          className={`flex items-center gap-2 rounded-full p-1 pr-1 transition-colors hover:bg-neutral-100 sm:pr-3 ${
+            pathname === "/perfil" ? "bg-neutral-100" : ""
+          }`}
+        >
+          <span
+            aria-hidden
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white"
+          >
+            {getInitials(name)}
+          </span>
+          <span className="hidden text-sm font-semibold sm:block">{name}</span>
+          <span className="sr-only sm:hidden">Meu perfil</span>
+        </Link>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          title="Sair"
+          aria-label="Sair"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+        >
+          <LogOut size={17} />
+        </button>
       </div>
     </header>
   );

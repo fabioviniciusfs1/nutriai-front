@@ -1,19 +1,5 @@
 import type { FoodFeedback } from "@/lib/food-feedback";
 
-export const dailyCalorieGoal = "2.000 kcal";
-
-export const dailyWaterGoal = "2,5 L";
-
-export const calorieIntake = [
-  { day: "Seg", calorias: 1850, meta: 2000 },
-  { day: "Ter", calorias: 2120, meta: 2000 },
-  { day: "Qua", calorias: 1940, meta: 2000 },
-  { day: "Qui", calorias: 1780, meta: 2000 },
-  { day: "Sex", calorias: 2250, meta: 2000 },
-  { day: "Sáb", calorias: 2380, meta: 2000 },
-  { day: "Dom", calorias: 1985, meta: 2000 },
-];
-
 export const macroBreakdown = [
   { name: "Proteínas", value: 25, atual: 145, meta: 150, color: "#f4623a" },
   { name: "Gorduras", value: 45, atual: 65, meta: 70, color: "#f9c9b8" },
@@ -53,7 +39,7 @@ export const initialChatMessages = [
   {
     id: 1,
     role: "assistant" as const,
-    text: "Olá, Masud! Sou seu assistente nutricional. Como posso te ajudar hoje?",
+    text: "Olá, {nome}! Sou seu assistente nutricional. Como posso te ajudar hoje?",
   },
   {
     id: 2,
