@@ -1,4 +1,5 @@
 import type { FoodFeedback } from "@/lib/food-feedback";
+import type { WeightEntry } from "@/lib/auth";
 
 export const macroBreakdown = [
   { name: "Proteínas", value: 25, atual: 145, meta: 150, color: "#f4623a" },
@@ -6,14 +7,23 @@ export const macroBreakdown = [
   { name: "Carboidratos", value: 30, atual: 220, meta: 250, color: "#7fc1e8" },
 ];
 
-export const otherMacros = [
+export type Nutrient = {
+  name: string;
+  atual: number;
+  meta: number;
+  unit: string;
+  /** `meta` é um limite máximo (ficar abaixo é o bom), não um alvo a atingir. */
+  limit?: boolean;
+};
+
+export const otherMacros: Nutrient[] = [
   { name: "Fibras", atual: 22, meta: 30, unit: "g" },
-  { name: "Açúcares", atual: 38, meta: 50, unit: "g" },
-  { name: "Gordura saturada", atual: 16, meta: 20, unit: "g" },
-  { name: "Colesterol", atual: 210, meta: 300, unit: "mg" },
+  { name: "Açúcares", atual: 38, meta: 50, unit: "g", limit: true },
+  { name: "Gordura saturada", atual: 16, meta: 20, unit: "g", limit: true },
+  { name: "Colesterol", atual: 210, meta: 300, unit: "mg", limit: true },
 ];
 
-export const vitamins = [
+export const vitamins: Nutrient[] = [
   { name: "Vitamina A", atual: 620, meta: 900, unit: "µg" },
   { name: "Vitamina B12", atual: 2.1, meta: 2.4, unit: "µg" },
   { name: "Vitamina C", atual: 95, meta: 90, unit: "mg" },
@@ -23,12 +33,12 @@ export const vitamins = [
   { name: "Ácido fólico (B9)", atual: 310, meta: 400, unit: "µg" },
 ];
 
-export const minerals = [
+export const minerals: Nutrient[] = [
   { name: "Cálcio", atual: 780, meta: 1000, unit: "mg" },
   { name: "Ferro", atual: 12, meta: 8, unit: "mg" },
   { name: "Magnésio", atual: 290, meta: 420, unit: "mg" },
   { name: "Potássio", atual: 2900, meta: 3400, unit: "mg" },
-  { name: "Sódio", atual: 1800, meta: 2000, unit: "mg" },
+  { name: "Sódio", atual: 1800, meta: 2000, unit: "mg", limit: true },
   { name: "Zinco", atual: 9, meta: 11, unit: "mg" },
   { name: "Selênio", atual: 48, meta: 55, unit: "µg" },
 ];
@@ -132,6 +142,59 @@ export const activityHistory = Array.from({ length: 90 }, (_, i) => {
     source: "Google Fit" as const,
   };
 });
+
+// Mesmos nutrientes da página Nutrientes, agrupados para o seletor do histórico.
+export const nutrientGroups: { name: string; nutrients: Nutrient[] }[] = [
+  {
+    name: "Macronutrientes",
+    nutrients: [
+      ...macroBreakdown.map(({ name, atual, meta }) => ({ name, atual, meta, unit: "g" })),
+      ...otherMacros,
+    ],
+  },
+  { name: "Vitaminas", nutrients: vitamins },
+  { name: "Minerais", nutrients: minerals },
+];
+
+// Consumo diário de cada nutriente nas mesmas datas de activityHistory. O último dia é
+// o consumo de "hoje" mostrado na página Nutrientes; os anteriores variam ±25% em torno dele.
+export const nutrientHistory = activityHistory.map(({ date }, i) => {
+  const values: Record<string, number> = {};
+  nutrientGroups
+    .flatMap((group) => group.nutrients)
+    .forEach(({ name, atual, meta }, k) => {
+      if (i === activityHistory.length - 1) {
+        values[name] = atual;
+        return;
+      }
+      const value = atual * (0.75 + seeded(i * 13 + k * 101 + 700) * 0.5);
+      values[name] = meta < 10 ? Math.round(value * 10) / 10 : Math.round(value);
+    });
+  return { date, values };
+});
+
+// Pesagens simuladas nos 90 dias ANTES do primeiro peso real do usuário, perdendo de 0,5 a
+// 1 kg por semana até chegar nele. Só aparecem no gráfico; nada disso é salvo no localStorage.
+export function mockWeightHistory(firstRealEntry: WeightEntry): WeightEntry[] {
+  const entries: WeightEntry[] = [];
+  const at = new Date(firstRealEntry.at);
+  let kg = firstRealEntry.kg;
+  let daysBack = 0;
+
+  for (let i = 0; daysBack < 90; i++) {
+    // Pesagens a cada 3 ou 4 dias (cerca de duas por semana), de manhã.
+    const step = i % 2 === 0 ? 3 : 4;
+    daysBack += step;
+    const weeklyLoss = 0.5 + seeded(i + 900) * 0.5;
+    kg += (weeklyLoss * step) / 7;
+
+    const date = new Date(at);
+    date.setDate(date.getDate() - daysBack);
+    date.setHours(6 + Math.floor(seeded(i + 950) * 3), Math.floor(seeded(i + 980) * 60), 0, 0);
+    entries.unshift({ id: `mock-${i}`, at: date.toISOString(), kg: Math.round(kg * 10) / 10 });
+  }
+  return entries;
+}
 
 export const activitySources = [
   { name: "Google Fit", platform: "Android", connected: true, lastSync: "21/09/2026 às 22:14" },

@@ -6,6 +6,14 @@ import type { Profile } from "@/lib/calorie-target";
 const USERS_KEY = "nutriai:users";
 const SESSION_KEY = "nutriai:session";
 
+/** Peso registrado pelo usuário. Só histórico: não altera `profile.weightKg` nem a meta calórica. */
+export type WeightEntry = {
+  id: string;
+  /** Data/hora da pesagem em ISO 8601. */
+  at: string;
+  kg: number;
+};
+
 type StoredUser = {
   name: string;
   username: string;
@@ -13,12 +21,15 @@ type StoredUser = {
   profile: Profile | null;
   /** Horário escolhido pelo usuário para cada refeição do plano (id da refeição → "HH:MM"). */
   mealTimes?: Record<number, string>;
+  weights?: WeightEntry[];
 };
 
 export type AuthState = {
   user: { name: string; username: string } | null;
   profile: Profile | null;
   mealTimes: Record<number, string>;
+  /** Ordenados do mais antigo para o mais recente. */
+  weights: WeightEntry[];
 };
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -128,6 +139,15 @@ export function saveMealTime(mealId: number, time: string) {
   writeUsers(users);
 }
 
+export function addWeightEntry(kg: number, at: Date) {
+  const username = readStorage(SESSION_KEY);
+  const users = readUsers();
+  if (!username || !users[username]) return;
+  const entry: WeightEntry = { id: `${at.getTime()}-${Math.random().toString(36).slice(2, 8)}`, at: at.toISOString(), kg };
+  users[username] = { ...users[username], weights: [...(users[username].weights ?? []), entry] };
+  writeUsers(users);
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   // Mantém abas diferentes sincronizadas (login/logout em outra aba).
@@ -139,7 +159,7 @@ function subscribe(listener: () => void) {
 }
 
 let cachedKey: string | undefined;
-let cachedState: AuthState = { user: null, profile: null, mealTimes: {} };
+let cachedState: AuthState = { user: null, profile: null, mealTimes: {}, weights: [] };
 
 function getSnapshot(): AuthState {
   const usersRaw = readStorage(USERS_KEY);
@@ -150,8 +170,13 @@ function getSnapshot(): AuthState {
   const user = session ? readUsers()[session] : undefined;
   cachedKey = key;
   cachedState = user
-    ? { user: { name: user.name, username: user.username }, profile: user.profile, mealTimes: user.mealTimes ?? {} }
-    : { user: null, profile: null, mealTimes: {} };
+    ? {
+        user: { name: user.name, username: user.username },
+        profile: user.profile,
+        mealTimes: user.mealTimes ?? {},
+        weights: [...(user.weights ?? [])].sort((a, b) => a.at.localeCompare(b.at)),
+      }
+    : { user: null, profile: null, mealTimes: {}, weights: [] };
   return cachedState;
 }
 

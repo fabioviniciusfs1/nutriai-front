@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { activityHistory } from "@/lib/mock-data";
+import { activityHistory, nutrientHistory } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth";
 import { calculateCalorieTarget } from "@/lib/calorie-target";
 import { StatTile } from "@/components/history/StatTile";
 import { BalanceChart } from "@/components/history/BalanceChart";
+import { WeightChart } from "@/components/history/WeightChart";
 import { ActivityPanel } from "@/components/history/ActivityPanel";
+import { NutrientChart } from "@/components/history/NutrientChart";
 import { formatSigned, numberFormat } from "@/components/history/format";
 
 const PERIODS = [7, 30, 90] as const;
@@ -65,7 +67,9 @@ export function HistoryDashboard() {
         />
       </div>
 
+      <WeightChart period={period} />
       <BalanceChart days={days} goal={calorieGoal} />
+      <NutrientChart days={nutrientHistory.slice(-period)} />
       <ActivityPanel days={days} />
     </>
   );

@@ -5,6 +5,7 @@ import { Clock, Flame, Wheat, Drumstick, Droplet } from "lucide-react";
 import { mealPlan } from "@/lib/mock-data";
 import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
+import { TimePickerDialog } from "@/components/dashboard/TimePickerDialog";
 import { saveMealTime, useAuth } from "@/lib/auth";
 
 function sumTotals(foods: (typeof mealPlan)[number]["foods"]) {
@@ -22,6 +23,7 @@ function sumTotals(foods: (typeof mealPlan)[number]["foods"]) {
 export function MealPlan() {
   const [time, setTime] = useState("Todos");
   const savedTimes = useAuth()?.mealTimes;
+  const [editingTime, setEditingTime] = useState<{ id: number; title: string; time: string } | null>(null);
   const [feedback, setFeedback] = useState<Record<string, FoodFeedback>>({});
 
   const [pending, setPending] = useState<{
@@ -80,31 +82,15 @@ export function MealPlan() {
             <li key={meal.id} className="rounded-xl border border-neutral-100 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold text-neutral-900">{meal.title}</p>
-                <label
+                <button
+                  type="button"
                   title="Alterar horário da refeição"
-                  className="flex cursor-pointer items-center gap-1 rounded-full bg-neutral-100 text-xs px-2.5 py-1 font-medium text-neutral-600 transition-colors hover:bg-neutral-200 focus-within:ring-2 focus-within:ring-accent"
+                  aria-label={`Horário da refeição: ${meal.title}, ${meal.time}. Alterar`}
+                  onClick={() => setEditingTime({ id: meal.id, title: meal.title, time: meal.time })}
+                  className="flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-200"
                 >
-                  <Clock size={12} />
-                  <input
-                    type="time"
-                    value={meal.time}
-                    aria-label={`Horário da refeição: ${meal.title}`}
-                    onClick={(event) => {
-                      try {
-                        event.currentTarget.showPicker();
-                      } catch {
-                        // showPicker não suportado: o campo continua editável pelo teclado.
-                      }
-                    }}
-                    onChange={(event) => {
-                      if (!event.target.value) return;
-                      saveMealTime(meal.id, event.target.value);
-                      // O filtro ativo segue a refeição para o novo horário.
-                      if (time === meal.time) setTime(event.target.value);
-                    }}
-                    className="cursor-pointer bg-transparent outline-none [&::-webkit-calendar-picker-indicator]:hidden"
-                  />
-                </label>
+                  <Clock size={12} /> {meal.time}
+                </button>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-500">
                 <span className="flex items-center gap-1">
@@ -194,6 +180,21 @@ export function MealPlan() {
           );
         })}
       </ul>
+
+      <TimePickerDialog
+        open={editingTime !== null}
+        title={`Horário: ${editingTime?.title ?? ""}`}
+        value={editingTime?.time ?? "00:00"}
+        onConfirm={(value) => {
+          if (editingTime) {
+            saveMealTime(editingTime.id, value);
+            // O filtro ativo segue a refeição para o novo horário.
+            if (time === editingTime.time) setTime(value);
+          }
+          setEditingTime(null);
+        }}
+        onCancel={() => setEditingTime(null)}
+      />
 
       <ConfirmDialog
         open={pending !== null}
