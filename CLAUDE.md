@@ -13,10 +13,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 There is no test suite configured in this repo.
 
+## Cloudflare
+
+- Deployed to Cloudflare Workers as a **static site** (`wrangler.jsonc`, `assets.directory: ./out`). `npm run build:cloudflare` sets `NEXT_OUTPUT=export`, which switches `next.config.ts` from `output: "standalone"` to `output: "export"` and writes one HTML file per route to `out/`. `wrangler.jsonc` runs that command itself (`build.command`) before `wrangler deploy` / `wrangler preview`, and has the empty `previews` block that `wrangler preview` requires.
+- This only works because every route is static and all data lives in the browser. Adding server features (route handlers that read the request, middleware/proxy, `cookies()`/`headers()`, `next/image` optimization) would break the static export — the deploy would then need the OpenNext Cloudflare adapter instead.
+
 ## Docker
 
 - `docker compose up -d --build` builds and runs the production image on port 3000.
-- The `Dockerfile` is a 3-stage build (`deps` → `builder` → `runner`) relying on `output: "standalone"` in `next.config.ts`; the runner stage only copies `.next/standalone`, `.next/static`, and `public`, and runs as a non-root `nextjs` user. If you add a dependency that needs native/runtime files not covered by the standalone trace, the Docker image will be missing them even though `next dev`/`next build` work fine locally.
+- The `Dockerfile` is a 3-stage build (`deps` → `builder` → `runner`) relying on `output: "standalone"` in `next.config.ts` (the default when `NEXT_OUTPUT` is not `export`); the runner stage only copies `.next/standalone`, `.next/static`, and `public`, and runs as a non-root `nextjs` user. If you add a dependency that needs native/runtime files not covered by the standalone trace, the Docker image will be missing them even though `next dev`/`next build` work fine locally.
 
 ## Architecture
 
