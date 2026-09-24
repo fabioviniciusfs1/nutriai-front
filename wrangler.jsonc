@@ -14,6 +14,13 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
   },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "persist": true
+    }
+  },
   // Exigido por `wrangler preview` (deploys de branches que não são a principal).
   "previews": {}
 }
