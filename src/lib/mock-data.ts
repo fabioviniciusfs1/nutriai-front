@@ -1,10 +1,11 @@
 import type { FoodFeedback } from "@/lib/food-feedback";
 import type { WeightEntry } from "@/lib/auth";
 
+// `kcalPerGram`: fator de Atwater, usado para somar as calorias consumidas no dia.
 export const macroBreakdown = [
-  { name: "Proteínas", value: 25, atual: 145, meta: 150, color: "#f4623a" },
-  { name: "Gorduras", value: 45, atual: 65, meta: 70, color: "#f9c9b8" },
-  { name: "Carboidratos", value: 30, atual: 220, meta: 250, color: "#7fc1e8" },
+  { name: "Proteínas", atual: 145, meta: 150, color: "#f4623a", kcalPerGram: 4 },
+  { name: "Gorduras", atual: 65, meta: 70, color: "#f9c9b8", kcalPerGram: 9 },
+  { name: "Carboidratos", atual: 220, meta: 250, color: "#7fc1e8", kcalPerGram: 4 },
 ];
 
 export type Nutrient = {

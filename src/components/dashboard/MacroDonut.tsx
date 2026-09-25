@@ -1,44 +1,27 @@
 "use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, type PieLabelRenderProps } from "recharts";
-import { MoreHorizontal, GlassWater } from "lucide-react";
-import { macroBreakdown } from "@/lib/mock-data";
+import { MoreHorizontal, GlassWater, Flame } from "lucide-react";
+import { activityHistory, macroBreakdown } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth";
 import { calculateCalorieTarget, calculateWaterLiters } from "@/lib/calorie-target";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
 
-const RADIAN = Math.PI / 180;
+// Calorias de hoje (simuladas): consumidas a partir dos macros já ingeridos e gastas a partir do
+// último dia de atividade (Google Fit / Apple Saúde).
+const consumedKcal = macroBreakdown.reduce((sum, macro) => sum + macro.atual * macro.kcalPerGram, 0);
+const today = activityHistory[activityHistory.length - 1];
 
-function renderInsideLabel({ cx, cy, midAngle, innerRadius, outerRadius, value }: PieLabelRenderProps) {
-  const inner = Number(innerRadius);
-  const outer = Number(outerRadius);
-  const centerX = Number(cx);
-  const centerY = Number(cy);
-  const radius = inner + (outer - inner) * 0.5;
-  const x = centerX + radius * Math.cos(-midAngle! * RADIAN);
-  const y = centerY + radius * Math.sin(-midAngle! * RADIAN);
-
-  return (
-    <text
-      x={x}
-      y={y}
-      textAnchor="middle"
-      dominantBaseline="central"
-      fontSize={13}
-      fontWeight={600}
-      fill="#1f2421"
-    >
-      {`${value}%`}
-    </text>
-  );
-}
+// Semicírculo de raio 80 centrado em (100, 100); `pathLength` 100 deixa o progresso em %.
+const ARC = "M 20 100 A 80 80 0 0 1 180 100";
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
 
 export function MacroDonut() {
   const profile = useAuth()?.profile;
-  const calorieGoal = profile ? `${numberFormat.format(calculateCalorieTarget(profile).target)} kcal` : "—";
+  const target = profile ? calculateCalorieTarget(profile).target : null;
+  const calorieGoal = target ? `${numberFormat.format(target)} kcal` : "—";
   const waterGoal = profile ? `${numberFormat.format(calculateWaterLiters(profile.weightKg))} L` : "—";
+  const percent = target ? Math.round((consumedKcal / target) * 100) : 0;
 
   return (
     <div className="flex h-full flex-col rounded-2xl bg-white p-5 shadow-sm">
@@ -54,29 +37,47 @@ export function MacroDonut() {
       </div>
 
       <div className="mt-4 flex flex-1 flex-col items-center gap-6 sm:flex-row sm:gap-10">
-        <div className="relative h-48 w-48 shrink-0 sm:h-56 sm:w-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={macroBreakdown}
-                dataKey="value"
-                nameKey="name"
-                innerRadius="65%"
-                outerRadius="100%"
-                paddingAngle={3}
-                startAngle={90}
-                endAngle={-270}
-                stroke="none"
-                label={renderInsideLabel}
-                labelLine={false}
-                isAnimationActive={false}
-              >
-                {macroBreakdown.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
+        <div className="flex w-56 shrink-0 flex-col items-center sm:w-64">
+          <div className="relative w-full">
+            <svg
+              viewBox="0 0 200 110"
+              className="w-full"
+              role="img"
+              aria-label={
+                target
+                  ? `${numberFormat.format(consumedKcal)} de ${numberFormat.format(target)} kcal consumidas (${percent}%)`
+                  : "Calorias consumidas"
+              }
+            >
+              <path d={ARC} pathLength={100} fill="none" strokeWidth={16} strokeLinecap="round" className="stroke-neutral-100" />
+              {percent > 0 && (
+                <path
+                  d={ARC}
+                  pathLength={100}
+                  fill="none"
+                  strokeWidth={16}
+                  strokeLinecap="round"
+                  // Acima da meta o arco fica cheio.
+                  strokeDasharray={`${Math.min(percent, 100)} 100`}
+                  className="stroke-accent"
+                />
+              )}
+            </svg>
+            <div className="absolute inset-x-0 bottom-0 flex flex-col items-center">
+              <span className="text-2xl font-bold tabular-nums text-neutral-900 sm:text-3xl">
+                {numberFormat.format(consumedKcal)}
+              </span>
+              <span className="text-xs text-neutral-500">kcal consumidas</span>
+            </div>
+          </div>
+
+          <div className="mt-3 flex w-full items-center gap-2 border-t border-neutral-100 pt-3 text-sm">
+            <Flame size={16} className="text-accent" />
+            <span className="text-neutral-700">Calorias gastas</span>
+            <span className="ml-auto font-semibold tabular-nums text-neutral-900">
+              {numberFormat.format(today.burned)} kcal
+            </span>
+          </div>
         </div>
 
         <div className="flex w-full flex-1 flex-col gap-3">
