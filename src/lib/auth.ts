@@ -16,16 +16,16 @@ export type WeightEntry = {
   kg: number;
 };
 
-/** Mudanças no plano feitas pelo usuário num dia (remover/trocar/redistribuir refeições). */
-export type DayPlanChanges = {
+type PlanFoods = (typeof mealPlan)[number]["foods"];
+
+/**
+ * Mudanças permanentes no plano, até o usuário desfazer: refeições removidas com "não fazer nada",
+ * refeições criadas e alimentos acrescentados. Criar/acrescentar tira as calorias das outras
+ * refeições (reduzindo as porções), para o total do dia não aumentar.
+ */
+export type PlanChanges = {
+  /** Refeições do plano base removidas com "não fazer nada" (para voltar, só criando outra). */
   removed: number[];
-  replacements: Record<number, { title: string; foods: (typeof mealPlan)[number]["foods"] }>;
-  /**
-   * Fator das porções de cada refeição do dia (id → fator). Ao criar uma refeição, as outras são
-   * reduzidas na mesma proporção para abrir espaço para ela; ao remover com "redistribuir", as
-   * seguintes aumentam para receber as calorias. Em ambos os casos o total do dia não aumenta.
-   */
-  scales: Record<number, number>;
   /** Refeições criadas pelo usuário: nome e horário dele, alimentos sugeridos pelo sistema. */
   added: {
     id: number;
@@ -33,15 +33,41 @@ export type DayPlanChanges = {
     time: string;
     /** Nome da sugestão de onde vieram os alimentos. */
     suggestion: string;
-    foods: (typeof mealPlan)[number]["foods"];
+    foods: PlanFoods;
   }[];
+  /**
+   * Alimentos acrescentados pelo usuário a cada refeição (id → alimentos), na porção "base" (fator 1):
+   * mudam junto com as porções da refeição.
+   */
+  extraFoods: Record<number, PlanFoods>;
+  /** Fator permanente das porções de cada refeição (id → fator). */
+  scales: Record<number, number>;
+};
+
+export const EMPTY_PLAN_CHANGES: PlanChanges = {
+  removed: [],
+  added: [],
+  extraFoods: {},
+  scales: {},
+};
+
+/** Mudanças que valem só no dia em que foram feitas ("sugerir uma nova" e "redistribuir"). */
+export type DayPlanChanges = {
+  /** Removidas hoje com "redistribuir". */
+  removed: number[];
+  /** Trocadas hoje por outra sugestão. */
+  replacements: Record<number, { title: string; foods: PlanFoods }>;
+  /**
+   * Fator das porções só de hoje (id → fator), multiplicado pelo permanente: ao remover com
+   * "redistribuir", as refeições seguintes aumentam para receber as calorias.
+   */
+  scales: Record<number, number>;
 };
 
 export const EMPTY_DAY_PLAN: DayPlanChanges = {
   removed: [],
   replacements: {},
   scales: {},
-  added: [],
 };
 
 /** Data local "AAAA-MM-DD": as mudanças do plano valem só para o dia em que foram feitas. */
@@ -58,7 +84,8 @@ type StoredUser = {
   /** Horário escolhido pelo usuário para cada refeição do plano (id da refeição → "HH:MM"). */
   mealTimes?: Record<number, string>;
   weights?: WeightEntry[];
-  /** Mudanças do plano de um dia; em outro dia são ignoradas e o plano base volta. */
+  planChanges?: PlanChanges;
+  /** Mudanças do plano de um dia; em outro dia são ignoradas. */
   dayPlan?: { date: string; changes: DayPlanChanges };
   /**
    * Alimentos restritos ("Não gosto / Não quero / Não tenho"): o assistente não os recomenda até o
@@ -84,6 +111,7 @@ export type AuthState = {
   mealTimes: Record<number, string>;
   /** Ordenados do mais antigo para o mais recente. */
   weights: WeightEntry[];
+  planChanges: PlanChanges;
   /** Mudanças do plano de hoje (vazio se não houver ou se forem de outro dia). */
   dayPlan: DayPlanChanges;
   foodFeedback: Record<string, FoodFeedback>;
@@ -215,6 +243,10 @@ export function saveDayPlanChanges(changes: DayPlanChanges) {
   writeUsers(users);
 }
 
+export function savePlanChanges(changes: PlanChanges) {
+  updateUser((user) => ({ ...user, planChanges: changes }));
+}
+
 function updateUser(update: (user: StoredUser) => StoredUser) {
   const username = readStorage(SESSION_KEY);
   const users = readUsers();
@@ -276,6 +308,7 @@ const SIGNED_OUT: AuthState = {
   profile: null,
   mealTimes: {},
   weights: [],
+  planChanges: EMPTY_PLAN_CHANGES,
   dayPlan: EMPTY_DAY_PLAN,
   foodFeedback: {},
   foodSubstitutes: {},
@@ -283,6 +316,15 @@ const SIGNED_OUT: AuthState = {
 };
 
 let cachedState: AuthState = SIGNED_OUT;
+
+/** Só os campos de hoje: planos salvos em versões antigas também traziam refeições criadas. */
+function dayChanges(changes: Partial<DayPlanChanges>): DayPlanChanges {
+  return {
+    removed: changes.removed ?? [],
+    replacements: changes.replacements ?? {},
+    scales: changes.scales ?? {},
+  };
+}
 
 function getSnapshot(): AuthState {
   const usersRaw = readStorage(USERS_KEY);
@@ -300,7 +342,8 @@ function getSnapshot(): AuthState {
         mealTimes: user.mealTimes ?? {},
         weights: [...(user.weights ?? [])].sort((a, b) => a.at.localeCompare(b.at)),
         // Mescla com o vazio: planos salvos antes de um campo existir (ex.: `added`) continuam válidos.
-        dayPlan: user.dayPlan?.date === today() ? { ...EMPTY_DAY_PLAN, ...user.dayPlan.changes } : EMPTY_DAY_PLAN,
+        planChanges: { ...EMPTY_PLAN_CHANGES, ...user.planChanges },
+        dayPlan: user.dayPlan?.date === today() ? dayChanges(user.dayPlan.changes) : EMPTY_DAY_PLAN,
         foodFeedback: user.foodFeedback ?? {},
         foodSubstitutes: user.foodSubstitutes ?? {},
         mealFoodSwaps: user.mealFoodSwaps ?? {},

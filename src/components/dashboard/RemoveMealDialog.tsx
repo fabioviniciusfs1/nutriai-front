@@ -43,7 +43,7 @@ export function RemoveMealDialog({
       id: "suggest",
       label: "Sim, sugerir uma nova",
       description: canSuggest
-        ? "Troca por outra refeição com calorias parecidas, no mesmo horário."
+        ? "Só hoje: troca por outra refeição com calorias parecidas, no mesmo horário. Amanhã ela volta."
         : "Não há outras sugestões disponíveis no momento.",
       disabled: !canSuggest,
     },
@@ -53,15 +53,16 @@ export function RemoveMealDialog({
       description:
         nextMealsCount === 0
           ? "Não há refeições depois desta no dia."
-          : `Os ${mealKcal} kcal desta refeição vão para ${
+          : `Só hoje: os ${mealKcal} kcal desta refeição vão para ${
               nextMealsCount === 1 ? "a próxima refeição" : `as ${nextMealsCount} próximas refeições`
-            }, que terão as porções aumentadas:`,
+            }, que terão as porções aumentadas. Amanhã ela volta:`,
       disabled: nextMealsCount === 0,
     },
     {
       id: "nothing",
       label: "Sim, não fazer nada",
-      description: "A refeição sai do plano e os nutrientes dela não são repostos.",
+      description:
+        "A refeição sai do plano de vez e os nutrientes dela não são repostos. Para voltar a ter uma refeição nesse horário, crie uma nova.",
     },
   ];
 
@@ -85,7 +86,7 @@ export function RemoveMealDialog({
         }}
       >
         <h4 className="font-semibold text-neutral-900">Remover refeição?</h4>
-        <p className="mt-1 text-sm text-neutral-600">&ldquo;{mealTitle}&rdquo; será removida do plano de hoje.</p>
+        <p className="mt-1 text-sm text-neutral-600">O que fazer com &ldquo;{mealTitle}&rdquo;?</p>
 
         <fieldset className="mt-4 flex min-w-0 flex-col gap-2">
           <legend className="sr-only">O que fazer ao remover</legend>

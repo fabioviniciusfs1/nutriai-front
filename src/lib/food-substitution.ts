@@ -19,7 +19,13 @@ export function catalogEntry(name: string) {
 export function convertFood(name: string, kcal: number): PlanFood | null {
   const entry = catalogEntry(name);
   if (!entry || entry.per100g.kcal === 0) return null;
-  const grams = Math.max(1, Math.round((kcal / entry.per100g.kcal) * 100));
+  return foodPortion(name, Math.max(1, Math.round((kcal / entry.per100g.kcal) * 100)));
+}
+
+/** O alimento `name` numa porção de `grams` gramas, com os nutrientes do catálogo. */
+export function foodPortion(name: string, grams: number): PlanFood | null {
+  const entry = catalogEntry(name);
+  if (!entry) return null;
   const factor = grams / 100;
   return {
     name,

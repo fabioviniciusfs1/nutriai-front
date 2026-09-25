@@ -89,11 +89,12 @@ export function CreateMealDialog({ open, preview, onConfirm, onCancel }: CreateM
                 ))}
               </ul>
               <p className="mt-2 text-xs text-neutral-500">
-                O total do dia continua em cerca de {numberFormat.format(dayKcal)} kcal.
+                O total do dia continua em cerca de {numberFormat.format(dayKcal)} kcal. A refeição fica no plano até
+                você removê-la.
               </p>
             </>
           ) : (
-            <p className="mt-3 text-sm text-neutral-600">Não há outras refeições hoje para ajustar.</p>
+            <p className="mt-3 text-sm text-neutral-600">Não há outras refeições para ajustar.</p>
           )}
 
           <div className="mt-5 flex items-center justify-end gap-2">

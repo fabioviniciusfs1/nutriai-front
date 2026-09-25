@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Flame, Wheat, Drumstick, Droplet, Plus, Trash2 } from "lucide-react";
+import { Clock, Flame, Wheat, Drumstick, Droplet, Plus, PlusCircle, Trash2 } from "lucide-react";
 import { mealAlternatives, mealPeriod, mealPlan } from "@/lib/mock-data";
 import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
 import { FoodFeedbackDialog } from "@/components/dashboard/FoodFeedbackDialog";
-import { resolveFoods, substituteOptions, usesRestrictedFood } from "@/lib/food-substitution";
+import { convertFood, resolveFoods, substituteOptions, usesRestrictedFood } from "@/lib/food-substitution";
 import { TimePickerDialog } from "@/components/dashboard/TimePickerDialog";
 import { RemoveMealDialog, type RemoveMealOption } from "@/components/dashboard/RemoveMealDialog";
 import { CreateMealDialog, type CreateMealPreview } from "@/components/dashboard/CreateMealDialog";
+import { AddFoodDialog, type AddFoodPreview } from "@/components/dashboard/AddFoodDialog";
 import {
   EMPTY_DAY_PLAN,
+  EMPTY_PLAN_CHANGES,
+  savePlanChanges,
+  type DayPlanChanges,
+  type PlanChanges,
   markFoodEverywhere,
   markFoodInMeal,
   saveDayPlanChanges,
@@ -55,7 +60,7 @@ type ScalableMeal = { id: number; totalsAt: (scale: number) => Totals };
 function fitFactor(meals: ScalableMeal[], scales: Record<number, number>, factor: number, limitKcal: number) {
   const kcalAt = (f: number) => meals.reduce((sum, meal) => sum + meal.totalsAt((scales[meal.id] ?? 1) * f).kcal, 0);
   let fitted = factor;
-  for (let i = 0; i < 20 && kcalAt(fitted) > limitKcal; i++) fitted *= 0.995;
+  for (let i = 0; i < 200 && kcalAt(fitted) > limitKcal; i++) fitted *= 0.999;
   return fitted;
 }
 
@@ -63,15 +68,18 @@ export function MealPlan() {
   const [time, setTime] = useState("Todos");
   const auth = useAuth();
   const savedTimes = auth?.mealTimes;
-  // Marcações valem por alimento e até o usuário mudar; remoções/trocas valem só para o dia de hoje.
+  // Marcações valem por alimento e até o usuário mudar. Remoções com "não fazer nada", refeições
+  // criadas e alimentos acrescentados são permanentes; "sugerir" e "redistribuir" valem só hoje.
   const feedback = auth?.foodFeedback ?? {};
   const substitutes = auth?.foodSubstitutes ?? {};
+  const planChanges = auth?.planChanges ?? EMPTY_PLAN_CHANGES;
   const dayPlan = auth?.dayPlan ?? EMPTY_DAY_PLAN;
-  const { removed, replacements, scales, added } = dayPlan;
+  const { replacements } = dayPlan;
   const mealFoodSwaps = auth?.mealFoodSwaps ?? {};
   const [editingTime, setEditingTime] = useState<{ id: number; title: string; time: string } | null>(null);
   const [removing, setRemoving] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const [addingFoodTo, setAddingFoodTo] = useState<number | null>(null);
 
   const [pending, setPending] = useState<{
     mealId: number;
@@ -92,47 +100,90 @@ export function MealPlan() {
   const pendingLabel = FOOD_FEEDBACK.find((item) => item.id === pending?.value)?.label ?? "";
   const pendingOptions = pending ? substituteOptions(pending.foodName, pending.kcal, feedback) : [];
 
-  const baseMeals = [
-    ...mealPlan.map((meal) => ({ ...meal, time: savedTimes?.[meal.id] ?? meal.time, custom: false, suggestion: "" })),
-    ...added.map((meal) => ({ ...meal, custom: true })),
-  ];
+  /**
+   * Plano com as mudanças permanentes `changes` e, se `day` vier, também com as de hoje. Cada
+   * alimento acrescentado pelo usuário leva `extraIndex` (a posição dele em `extraFoods`).
+   */
+  function buildPlan(changes: PlanChanges, day?: DayPlanChanges) {
+    const baseMeals = [
+      ...mealPlan.map((meal) => ({ ...meal, time: savedTimes?.[meal.id] ?? meal.time, suggestion: "" })),
+      ...changes.added,
+    ];
+    return baseMeals
+      .filter((meal) => !changes.removed.includes(meal.id) && !day?.removed.includes(meal.id))
+      .map((meal) => {
+        const replacement = day?.replacements[meal.id];
+        const scale = (changes.scales[meal.id] ?? 1) * (day?.scales[meal.id] ?? 1);
+        // Alimentos marcados como "Não gosto / Não quero / Não tenho" já entram trocados pelo substituto.
+        const swaps = { ...substitutes, ...mealFoodSwaps[meal.id] };
+        const planFoods = resolveFoods(replacement?.foods ?? meal.foods, swaps).map((food) => ({
+          ...food,
+          extraIndex: null as number | null,
+        }));
+        const extras = (changes.extraFoods[meal.id] ?? []).flatMap((food, extraIndex) =>
+          resolveFoods([food], swaps).map((resolved) => ({ ...resolved, extraIndex }))
+        );
+        const baseFoods = [...planFoods, ...extras];
+        // Porções ajustadas: menores quando uma refeição ou alimento novo abriu espaço, maiores
+        // quando receberam os nutrientes de uma refeição removida.
+        const foods = scaleFoods(baseFoods, scale);
+        return {
+          ...meal,
+          ...replacement,
+          foods,
+          totals: sumTotals(foods),
+          /** Totais se a porção desta refeição passar a ser `nextScale` (usado nos avisos). */
+          totalsAt: (nextScale: number) => sumTotals(scaleFoods(baseFoods, nextScale)),
+        };
+      })
+      .sort((a, b) => a.time.localeCompare(b.time));
+  }
 
-  const plan = baseMeals
-    .filter((meal) => !removed.includes(meal.id))
-    .map((meal) => {
-      const replacement = replacements[meal.id];
-      const scale = scales[meal.id] ?? 1;
-      // Alimentos marcados como "Não gosto / Não quero / Não tenho" já entram trocados pelo substituto.
-      const baseFoods = resolveFoods(replacement?.foods ?? meal.foods, { ...substitutes, ...mealFoodSwaps[meal.id] });
-      // Porções ajustadas no dia: menores quando uma refeição nova abriu espaço, maiores quando
-      // receberam os nutrientes de uma refeição removida.
-      const foods = scaleFoods(baseFoods, scale);
-      return {
-        ...meal,
-        ...replacement,
-        foods,
-        totals: sumTotals(foods),
-        /** Totais se a porção desta refeição passar a ser `nextScale` (usado nos avisos). */
-        totalsAt: (nextScale: number) => sumTotals(scaleFoods(baseFoods, nextScale)),
-      };
-    })
-    .sort((a, b) => a.time.localeCompare(b.time));
+  // O que o usuário vê hoje, e o plano só com as mudanças permanentes (base para criar refeições e
+  // acrescentar alimentos, que também são permanentes).
+  const plan = buildPlan(planChanges, dayPlan);
+  const permanentPlan = buildPlan(planChanges);
+  const todayScales = Object.fromEntries(
+    plan.map((meal) => [meal.id, (planChanges.scales[meal.id] ?? 1) * (dayPlan.scales[meal.id] ?? 1)])
+  );
+
   const mealTimes = ["Todos", ...new Set(plan.map((meal) => meal.time))];
   // Se a refeição do filtro ativo foi removida, volta para "Todos".
   const activeTime = mealTimes.includes(time) ? time : "Todos";
   const meals = plan.filter((meal) => activeTime === "Todos" || meal.time === activeTime);
 
   const removingMeal = plan.find((meal) => meal.id === removing);
+  const addingFoodMeal = plan.find((meal) => meal.id === addingFoodTo);
   const nextMeals = removingMeal ? plan.filter((meal) => meal.time > removingMeal.time) : [];
   const usedTitles = new Set([
     ...mealPlan.map((meal) => meal.title),
     ...Object.values(replacements).map((meal) => meal.title),
-    ...added.map((meal) => meal.suggestion),
+    ...planChanges.added.map((meal) => meal.suggestion),
   ]);
   // O assistente evita sugerir refeições com alimentos restritos (enquanto não forem liberados).
   const byRestriction = (a: (typeof mealAlternatives)[number], b: (typeof mealAlternatives)[number]) =>
     Number(usesRestrictedFood(a.foods, feedback)) - Number(usesRestrictedFood(b.foods, feedback));
   const availableAlternatives = mealAlternatives.filter((meal) => !usedTitles.has(meal.title)).sort(byRestriction);
+
+  /**
+   * Fator que todas as refeições do plano permanente recebem para abrir espaço para `kcal` novas
+   * sem passar do total atual do dia: o total passa a ser `targetKcal`.
+   */
+  function shareFactor(meals: ReturnType<typeof buildPlan>, targetKcal: number) {
+    const currentKcal = sumTotals(meals.map((meal) => meal.totals)).kcal;
+    if (currentKcal === 0) return 1;
+    return fitFactor(meals, planChanges.scales, targetKcal / currentKcal, targetKcal);
+  }
+
+  /** Previa de como ficam as refeições de hoje se as porções permanentes mudarem por `factor`. */
+  function previewSources(factor: number) {
+    return plan.map((meal) => ({
+      title: meal.title,
+      time: meal.time,
+      before: meal.totals.kcal,
+      after: meal.totalsAt(todayScales[meal.id] * factor).kcal,
+    }));
+  }
 
   /**
    * Planeja uma refeição nova sem mudar o total de calorias do dia (e sem passar da meta): ela fica
@@ -149,14 +200,13 @@ export function MealPlan() {
       [...mealAlternatives].sort(byRestriction).find(inPeriod) ??
       mealAlternatives[0];
 
-    const dayKcal = sumTotals(plan.map((meal) => meal.totals)).kcal;
+    const dayKcal = sumTotals(permanentPlan.map((meal) => meal.totals)).kcal;
     const suggestedKcal = sumTotals(suggestion.foods).kcal;
-    // Com o plano do dia vazio não há de onde tirar: a sugestão entra com a porção original.
-    const portion = dayKcal === 0 ? 1 : Math.min(1, dayKcal / (plan.length + 1) / suggestedKcal);
+    // Com o plano vazio não há de onde tirar: a sugestão entra com a porção original.
+    const portion = dayKcal === 0 ? 1 : Math.min(1, dayKcal / (permanentPlan.length + 1) / suggestedKcal);
     const foods = scaleFoods(suggestion.foods, portion);
     const totals = sumTotals(foods);
-    const othersFactor =
-      dayKcal === 0 ? 1 : fitFactor(plan, scales, (dayKcal - totals.kcal) / dayKcal, dayKcal - totals.kcal);
+    const othersFactor = shareFactor(permanentPlan, dayKcal - totals.kcal);
 
     return { title, time: mealTime, suggestion: suggestion.title, foods, totals, othersFactor };
   }
@@ -166,36 +216,81 @@ export function MealPlan() {
     return {
       totals,
       reductionPercent: Math.round((1 - othersFactor) * 100),
-      sources: plan.map((meal) => ({
-        title: meal.title,
-        time: meal.time,
-        before: meal.totals.kcal,
-        after: meal.totalsAt((scales[meal.id] ?? 1) * othersFactor).kcal,
-      })),
+      sources: previewSources(othersFactor),
     };
+  }
+
+  function scaleAll(factor: number) {
+    const nextScales = { ...planChanges.scales };
+    for (const meal of permanentPlan) nextScales[meal.id] = (planChanges.scales[meal.id] ?? 1) * factor;
+    return nextScales;
   }
 
   function createMeal(title: string, mealTime: string) {
     const { suggestion, foods, othersFactor } = planNewMeal(title, mealTime);
-    const id = Math.max(1000, ...added.map((meal) => meal.id)) + 1;
-    const nextScales = { ...scales };
-    for (const meal of plan) nextScales[meal.id] = (scales[meal.id] ?? 1) * othersFactor;
-
-    saveDayPlanChanges({
-      ...dayPlan,
-      scales: nextScales,
-      added: [...added, { id, title, time: mealTime, suggestion, foods }],
+    const id = Math.max(1000, ...planChanges.added.map((meal) => meal.id)) + 1;
+    savePlanChanges({
+      ...planChanges,
+      scales: scaleAll(othersFactor),
+      added: [...planChanges.added, { id, title, time: mealTime, suggestion, foods }],
     });
     setTime("Todos");
     setCreating(false);
   }
 
+  /**
+   * Alimento que o usuário quer comer: o assistente (simulado) escolhe a porção — a média dos
+   * alimentos da refeição em kcal — e todas as refeições reduzem as porções na mesma proporção,
+   * para o total do dia não aumentar.
+   */
+  function planFood(mealId: number, foodName: string): AddFoodPreview | null {
+    const meal = permanentPlan.find((item) => item.id === mealId);
+    if (!meal) return null;
+    const dayKcal = sumTotals(permanentPlan.map((item) => item.totals)).kcal;
+    const portionKcal = Math.round(meal.totals.kcal / (meal.foods.length + 1)) || 100;
+    const food = convertFood(foodName, portionKcal);
+    if (!food) return null;
+    const factor = shareFactor(permanentPlan, dayKcal - food.kcal);
+    return { food, reductionPercent: Math.round((1 - factor) * 100), factor };
+  }
+
+  function addFood(mealId: number, foodName: string) {
+    const planned = planFood(mealId, foodName);
+    if (!planned) return;
+    const scales = scaleAll(planned.factor);
+    // Guardado na porção "base" (fator 1) da refeição, para aparecer com as gramas sugeridas.
+    const base = convertFood(planned.food.name, planned.food.kcal / (scales[mealId] ?? 1));
+    if (base) {
+      savePlanChanges({
+        ...planChanges,
+        scales,
+        extraFoods: { ...planChanges.extraFoods, [mealId]: [...(planChanges.extraFoods[mealId] ?? []), base] },
+      });
+    }
+    setAddingFoodTo(null);
+  }
+
+  /** Tira um alimento acrescentado; as calorias dele voltam para as refeições do dia. */
+  function removeExtraFood(mealId: number, extraIndex: number) {
+    const dayKcal = sumTotals(permanentPlan.map((meal) => meal.totals)).kcal;
+    const extraFoods = {
+      ...planChanges.extraFoods,
+      [mealId]: (planChanges.extraFoods[mealId] ?? []).filter((_, index) => index !== extraIndex),
+    };
+    const nextPlan = buildPlan({ ...planChanges, extraFoods });
+    const currentKcal = sumTotals(nextPlan.map((meal) => meal.totals)).kcal;
+    const factor = currentKcal === 0 ? 1 : fitFactor(nextPlan, planChanges.scales, dayKcal / currentKcal, dayKcal);
+    const scales = { ...planChanges.scales };
+    for (const meal of nextPlan) scales[meal.id] = (planChanges.scales[meal.id] ?? 1) * factor;
+    savePlanChanges({ ...planChanges, extraFoods, scales });
+  }
+
   function changeMealTime(id: number, value: string) {
-    // Refeições criadas guardam o horário nas mudanças do dia; as do plano base, nos horários do usuário.
-    if (added.some((meal) => meal.id === id)) {
-      saveDayPlanChanges({
-        ...dayPlan,
-        added: added.map((meal) => (meal.id === id ? { ...meal, time: value } : meal)),
+    // Refeições criadas guardam o horário junto delas; as do plano base, nos horários do usuário.
+    if (planChanges.added.some((meal) => meal.id === id)) {
+      savePlanChanges({
+        ...planChanges,
+        added: planChanges.added.map((meal) => (meal.id === id ? { ...meal, time: value } : meal)),
       });
     } else {
       saveMealTime(id, value);
@@ -204,20 +299,20 @@ export function MealPlan() {
 
   /**
    * "Redistribuir": as refeições seguintes aumentam as porções na mesma proporção para receber as
-   * calorias da removida, sem passar do total que o dia tinha.
+   * calorias da removida, sem passar do total que o dia tinha. Vale só para hoje.
    */
   function planRedistribution() {
     if (!removingMeal || nextMeals.length === 0) return { factor: 1, preview: [] };
     const nextKcal = nextMeals.reduce((sum, meal) => sum + meal.totals.kcal, 0);
     const limit = nextKcal + removingMeal.totals.kcal;
-    const factor = nextKcal === 0 ? 1 : fitFactor(nextMeals, scales, limit / nextKcal, limit);
+    const factor = nextKcal === 0 ? 1 : fitFactor(nextMeals, todayScales, limit / nextKcal, limit);
     return {
       factor,
       preview: nextMeals.map((meal) => ({
         title: meal.title,
         time: meal.time,
         before: meal.totals.kcal,
-        after: meal.totalsAt((scales[meal.id] ?? 1) * factor).kcal,
+        after: meal.totalsAt(todayScales[meal.id] * factor).kcal,
       })),
     };
   }
@@ -238,12 +333,21 @@ export function MealPlan() {
       if (alternative) {
         saveDayPlanChanges({ ...dayPlan, replacements: { ...replacements, [id]: alternative } });
       }
+    } else if (option === "redistribute") {
+      const scales = { ...dayPlan.scales };
+      for (const meal of nextMeals) scales[meal.id] = (dayPlan.scales[meal.id] ?? 1) * redistribution.factor;
+      saveDayPlanChanges({ ...dayPlan, removed: [...dayPlan.removed, id], scales });
     } else {
-      const nextScales = { ...scales };
-      if (option === "redistribute") {
-        for (const meal of nextMeals) nextScales[meal.id] = (scales[meal.id] ?? 1) * redistribution.factor;
-      }
-      saveDayPlanChanges({ ...dayPlan, removed: [...removed, id], scales: nextScales });
+      // "Não fazer nada" é permanente: para voltar a ter a refeição, o usuário cria outra.
+      const extraFoods = { ...planChanges.extraFoods };
+      delete extraFoods[id];
+      const isCreated = planChanges.added.some((meal) => meal.id === id);
+      savePlanChanges({
+        ...planChanges,
+        extraFoods,
+        added: planChanges.added.filter((meal) => meal.id !== id),
+        removed: isCreated ? planChanges.removed : [...planChanges.removed, id],
+      });
     }
     setRemoving(null);
   }
@@ -297,10 +401,19 @@ export function MealPlan() {
                 </button>
                 <button
                   type="button"
+                  title="Adicionar alimento"
+                  aria-label={`Adicionar alimento: ${meal.title}`}
+                  onClick={() => setAddingFoodTo(meal.id)}
+                  className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-green-50 hover:text-green-600"
+                >
+                  <PlusCircle size={16} />
+                </button>
+                <button
+                  type="button"
                   title="Remover refeição"
                   aria-label={`Remover refeição: ${meal.title}`}
                   onClick={() => setRemoving(meal.id)}
-                  className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -328,14 +441,15 @@ export function MealPlan() {
                   <span>Prot.</span>
                   <span>Gord.</span>
                   <span>Kcal</span>
-                  <span className="w-[5.75rem]" aria-hidden />
+                  <span className="w-[7.75rem]" aria-hidden />
                 </div>
                 {meal.foods.map((food, index) => {
+                  const { extraIndex } = food;
                   return (
                     <div
                       // Com substituições, o mesmo alimento pode aparecer duas vezes na refeição.
                       key={`${index}-${food.name}`}
-                      className="grid grid-cols-4 gap-x-2 gap-y-2 border-b border-neutral-100 py-3 text-sm text-neutral-700 last:border-b-0 sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] sm:border-neutral-50 sm:py-2"
+                      className="grid grid-cols-4 gap-x-2 gap-y-2 border-b border-neutral-100 py-3 text-sm text-neutral-700 last:border-b-0 sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] sm:items-center sm:border-neutral-50 sm:py-2"
                     >
                       <span className="col-span-3 font-medium text-neutral-900 sm:col-span-1 sm:font-normal sm:text-neutral-700">
                         {food.name}
@@ -357,7 +471,7 @@ export function MealPlan() {
                         <span className="text-xs text-neutral-400 sm:hidden">Kcal</span>
                         {food.kcal}
                       </span>
-                      <div className="col-span-4 flex items-center gap-1 sm:col-span-1">
+                      <div className="col-span-4 flex items-center gap-1 sm:col-span-1 sm:w-[7.75rem]">
                         {FOOD_FEEDBACK.map(({ id, label, Icon }) => (
                           <button
                             key={id}
@@ -367,11 +481,22 @@ export function MealPlan() {
                             onClick={() =>
                               setPending({ mealId: meal.id, mealTitle: meal.title, foodName: food.name, kcal: food.kcal, value: id })
                             }
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
                           >
                             <Icon size={15} />
                           </button>
                         ))}
+                        {extraIndex !== null && (
+                          <button
+                            type="button"
+                            title="Remover alimento"
+                            aria-label={`Remover alimento: ${food.name}`}
+                            onClick={() => removeExtraFood(meal.id, extraIndex)}
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -412,6 +537,15 @@ export function MealPlan() {
         canSuggest={availableAlternatives.length > 0}
         onConfirm={confirmRemoval}
         onCancel={() => setRemoving(null)}
+      />
+
+      <AddFoodDialog
+        open={addingFoodMeal !== undefined}
+        mealTitle={addingFoodMeal?.title ?? ""}
+        feedback={feedback}
+        preview={(foodName) => (addingFoodMeal ? planFood(addingFoodMeal.id, foodName) : null)}
+        onConfirm={(foodName) => addingFoodMeal && addFood(addingFoodMeal.id, foodName)}
+        onCancel={() => setAddingFoodTo(null)}
       />
 
       <FoodFeedbackDialog
