@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
-import { foodCatalog } from "@/lib/mock-data";
+import type { CatalogFood } from "@/lib/api/types";
 import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
 import type { PlanFood } from "@/lib/food-substitution";
 
@@ -20,6 +20,7 @@ type AddFoodDialogProps = {
   mealTitle: string;
   /** Alimentos restritos ("Não gosto / Não quero / Não tenho") não podem ser acrescentados. */
   feedback: Record<string, FoodFeedback>;
+  catalog: CatalogFood[];
   preview: (foodName: string) => AddFoodPreview | null;
   onConfirm: (foodName: string) => void;
   onCancel: () => void;
@@ -64,7 +65,7 @@ type SearchResult = {
   options: PlanFood[];
 };
 
-export function AddFoodDialog({ open, mealTitle, feedback, preview, onConfirm, onCancel }: AddFoodDialogProps) {
+export function AddFoodDialog({ open, mealTitle, feedback, catalog, preview, onConfirm, onCancel }: AddFoodDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState("");
   const [result, setResult] = useState<SearchResult | null>(null);
@@ -85,9 +86,9 @@ export function AddFoodDialog({ open, mealTitle, feedback, preview, onConfirm, o
   function search() {
     // Com o backend, o assistente de IA reconhece o alimento; aqui a busca é no catálogo.
     const query = normalize(name);
-    const allowed = foodCatalog.filter((food) => !feedback[food.name]);
+    const allowed = catalog.filter((food) => !feedback[food.name]);
     const matches = allowed.filter((food) => normalize(food.name).includes(query));
-    const exactRestricted = foodCatalog.find((food) => normalize(food.name) === query && feedback[food.name]);
+    const exactRestricted = catalog.find((food) => normalize(food.name) === query && feedback[food.name]);
     const candidates =
       matches.length > 0
         ? matches

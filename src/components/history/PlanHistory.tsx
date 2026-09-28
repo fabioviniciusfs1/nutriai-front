@@ -1,13 +1,22 @@
+"use client";
+
 import { Check, ChevronDown, X } from "lucide-react";
-import { planHistory } from "@/lib/mock-data";
+import { useApiQuery } from "@/lib/api/query";
+import type { PlanHistoryDay } from "@/lib/api/types";
+import { QueryStatus } from "@/components/api/QueryStatus";
 import { FOOD_FEEDBACK } from "@/lib/food-feedback";
 import { formatLongDate, numberFormat } from "@/components/history/format";
 
 export function PlanHistory() {
+  const { data: planHistory, error, reload } = useApiQuery<PlanHistoryDay[]>("/history/plans");
+  if (!planHistory) return <QueryStatus title="Planos Anteriores" error={error} onRetry={reload} />;
+
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
       <h3 className="font-semibold text-neutral-900">Planos Anteriores</h3>
       <p className="mt-1 text-xs text-neutral-500">Toque em um dia para ver as refeições</p>
+
+      {planHistory.length === 0 && <p className="mt-4 text-sm text-neutral-400">Nenhum plano anterior ainda.</p>}
 
       <ul className="mt-4 flex flex-col gap-3">
         {planHistory.map((plan) => {

@@ -16,12 +16,11 @@ import type { ValueType, NameType } from "recharts/types/component/DefaultToolti
 import { Plus, Scale } from "lucide-react";
 import { addWeightEntry, useAuth, type WeightEntry } from "@/lib/auth";
 import { WeightDialog } from "@/components/history/WeightDialog";
-import { mockWeightHistory } from "@/lib/mock-data";
 
 const LINE_COLOR = "#8b5cf6";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Pesagens são registradas no fuso do usuário (diferente das datas fixas em UTC do mock).
+// Pesagens são mostradas no fuso do usuário (as datas "AAAA-MM-DD" dos outros gráficos usam UTC).
 const shortDate = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" });
 const dateTime = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const longDateTime = new Intl.DateTimeFormat("pt-BR", {
@@ -80,9 +79,7 @@ type WeightChartProps = {
 export function WeightChart({ period }: WeightChartProps) {
   const auth = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const realEntries: WeightEntry[] = auth?.weights ?? [];
-  // Antes do primeiro registro real entra um histórico simulado, como nos outros gráficos.
-  const entries = realEntries.length > 0 ? [...mockWeightHistory(realEntries[0]), ...realEntries] : [];
+  const entries: WeightEntry[] = auth?.weights ?? [];
   const profileKg = auth?.profile?.weightKg;
 
   // O eixo termina no momento em que a página abriu, ou no último registro se ele for mais recente.

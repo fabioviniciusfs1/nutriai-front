@@ -14,16 +14,16 @@ import {
 } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { CircleCheck, TriangleAlert } from "lucide-react";
-import { nutrientGroups, type nutrientHistory } from "@/lib/mock-data";
+import type { Nutrient, NutrientHistoryDay } from "@/lib/api/types";
 import { formatLongDate, formatShortDate, numberFormat } from "@/components/history/format";
 
 const LINE_COLOR = "#f4623a";
 
 type NutrientChartProps = {
-  days: typeof nutrientHistory;
+  days: NutrientHistoryDay[];
+  /** Nutrientes do seletor, agrupados (ver `nutrientGroups`). Precisa ter pelo menos um. */
+  groups: { name: string; nutrients: Nutrient[] }[];
 };
-
-const allNutrients = nutrientGroups.flatMap((group) => group.nutrients);
 
 /** Arredonda o topo do eixo para um valor "redondo" (múltiplo de meia potência de 10). */
 function niceCeil(value: number) {
@@ -35,12 +35,14 @@ function percentOf(value: number, meta: number) {
   return Math.round((value / meta) * 100);
 }
 
-export function NutrientChart({ days }: NutrientChartProps) {
-  const [selected, setSelected] = useState(allNutrients[0].name);
-  const nutrient = allNutrients.find((item) => item.name === selected) ?? allNutrients[0];
+export function NutrientChart({ days, groups }: NutrientChartProps) {
+  const allNutrients = groups.flatMap((group) => group.nutrients);
+  const [selected, setSelected] = useState(allNutrients[0].id);
+  const nutrient = allNutrients.find((item) => item.id === selected) ?? allNutrients[0];
 
-  const data = days.map((day) => ({ date: day.date, value: day.values[nutrient.name] }));
-  const average = data.reduce((total, day) => total + day.value, 0) / data.length;
+  // Dia sem valor para o nutriente conta como 0 consumido.
+  const data = days.map((day) => ({ date: day.date, value: day.values[nutrient.id] ?? 0 }));
+  const average = data.length === 0 ? 0 : data.reduce((total, day) => total + day.value, 0) / data.length;
   const yMax = niceCeil(Math.max(nutrient.meta, ...data.map((day) => day.value)) * 1.1);
   const averageText = numberFormat.format(nutrient.meta < 10 ? Math.round(average * 10) / 10 : Math.round(average));
   // Nutrientes com limite máximo (açúcares, sódio…): ficar abaixo da linha é o bom.
@@ -95,14 +97,14 @@ export function NutrientChart({ days }: NutrientChartProps) {
         </div>
         <select
           aria-label="Nutriente"
-          value={nutrient.name}
+          value={nutrient.id}
           onChange={(event) => setSelected(event.target.value)}
           className="rounded-full border-0 bg-neutral-100 px-4 py-1.5 text-sm font-medium text-neutral-700 outline-none focus:ring-2 focus:ring-accent"
         >
-          {nutrientGroups.map((group) => (
+          {groups.map((group) => (
             <optgroup key={group.name} label={group.name}>
               {group.nutrients.map((item) => (
-                <option key={item.name} value={item.name}>
+                <option key={item.id} value={item.id}>
                   {item.limit ? `${item.name} (limite)` : item.name}
                 </option>
               ))}

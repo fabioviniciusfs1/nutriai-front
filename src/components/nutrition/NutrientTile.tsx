@@ -1,4 +1,4 @@
-import type { Nutrient } from "@/lib/mock-data";
+import type { Nutrient } from "@/lib/api/types";
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
 

@@ -1,6 +1,10 @@
 services:
   nutriai-front:
-    build: .
+    build:
+      context: .
+      args:
+        # Lido do ambiente ou do arquivo .env ao lado deste; é embutido no build da imagem.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?defina NEXT_PUBLIC_API_URL com a URL do backend}
     image: nutriai-front:latest
     container_name: nutriai-front
     ports:

@@ -1,4 +1,4 @@
-import type { Nutrient } from "@/lib/mock-data";
+import type { Nutrient } from "@/lib/api/types";
 import { NutrientTile } from "@/components/nutrition/NutrientTile";
 
 type NutrientSectionProps = {
@@ -19,7 +19,7 @@ export function NutrientSection({ title, description, groups }: NutrientSectionP
           {group.title && <h4 className="mb-2 text-sm font-medium text-neutral-500">{group.title}</h4>}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {group.nutrients.map((nutrient) => (
-              <NutrientTile key={nutrient.name} {...nutrient} />
+              <NutrientTile key={nutrient.id} {...nutrient} />
             ))}
           </div>
         </div>

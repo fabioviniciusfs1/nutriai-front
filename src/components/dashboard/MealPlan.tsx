@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { ArrowLeftRight, Clock, Flame, Wheat, Drumstick, Droplet, Plus, PlusCircle, Trash2 } from "lucide-react";
-import { mealAlternatives, mealPeriod, mealPlan } from "@/lib/mock-data";
+import { mealPeriod } from "@/lib/meal-period";
+import type { CatalogFood, Meal, MealAlternative } from "@/lib/api/types";
+import { useApiQuery } from "@/lib/api/query";
+import { QueryStatus } from "@/components/api/QueryStatus";
 import type { FoodFeedback } from "@/lib/food-feedback";
 import { FoodFeedbackDialog } from "@/components/dashboard/FoodFeedbackDialog";
-import { convertFood, resolveFoods, substituteOptions, usesRestrictedFood } from "@/lib/food-substitution";
+import { foodTools, usesRestrictedFood } from "@/lib/food-substitution";
 import { TimePickerDialog } from "@/components/dashboard/TimePickerDialog";
 import { RemoveMealDialog, type RemoveMealOption } from "@/components/dashboard/RemoveMealDialog";
 import { CreateMealDialog, type CreateMealPreview } from "@/components/dashboard/CreateMealDialog";
@@ -64,7 +67,23 @@ function fitFactor(meals: ScalableMeal[], scales: Record<number, number>, factor
   return fitted;
 }
 
+/** Plano base, sugestões do assistente e catálogo vêm do backend; o resto do plano é calculado aqui. */
 export function MealPlan() {
+  const plan = useApiQuery<Meal[]>("/meal-plan");
+  const alternatives = useApiQuery<MealAlternative[]>("/meal-alternatives");
+  const catalog = useApiQuery<CatalogFood[]>("/foods");
+
+  if (!plan.data || !alternatives.data || !catalog.data) {
+    const failed = [plan, alternatives, catalog].find((query) => query.error);
+    return <QueryStatus title="Plano Alimentar" error={failed?.error} onRetry={() => failed?.reload()} />;
+  }
+  return <MealPlanView basePlan={plan.data} alternatives={alternatives.data} catalog={catalog.data} />;
+}
+
+type MealPlanViewProps = { basePlan: Meal[]; alternatives: MealAlternative[]; catalog: CatalogFood[] };
+
+function MealPlanView({ basePlan, alternatives, catalog }: MealPlanViewProps) {
+  const { convertFood, resolveFoods, substituteOptions } = foodTools(catalog);
   const [time, setTime] = useState("Todos");
   const auth = useAuth();
   const savedTimes = auth?.mealTimes;
@@ -104,7 +123,7 @@ export function MealPlan() {
    */
   function buildPlan(changes: PlanChanges, day?: DayPlanChanges) {
     const baseMeals = [
-      ...mealPlan.map((meal) => ({ ...meal, time: savedTimes?.[meal.id] ?? meal.time, suggestion: "" })),
+      ...basePlan.map((meal) => ({ ...meal, time: savedTimes?.[meal.id] ?? meal.time, suggestion: "" })),
       ...changes.added,
     ];
     return baseMeals
@@ -154,14 +173,14 @@ export function MealPlan() {
   const addingFoodMeal = plan.find((meal) => meal.id === addingFoodTo);
   const nextMeals = removingMeal ? plan.filter((meal) => meal.time > removingMeal.time) : [];
   const usedTitles = new Set([
-    ...mealPlan.map((meal) => meal.title),
+    ...basePlan.map((meal) => meal.title),
     ...Object.values(replacements).map((meal) => meal.title),
     ...planChanges.added.map((meal) => meal.suggestion),
   ]);
   // O assistente evita sugerir refeições com alimentos restritos (enquanto não forem liberados).
-  const byRestriction = (a: (typeof mealAlternatives)[number], b: (typeof mealAlternatives)[number]) =>
+  const byRestriction = (a: MealAlternative, b: MealAlternative) =>
     Number(usesRestrictedFood(a.foods, feedback)) - Number(usesRestrictedFood(b.foods, feedback));
-  const availableAlternatives = mealAlternatives.filter((meal) => !usedTitles.has(meal.title)).sort(byRestriction);
+  const availableAlternatives = alternatives.filter((meal) => !usedTitles.has(meal.title)).sort(byRestriction);
 
   /**
    * Fator que todas as refeições do plano permanente recebem para abrir espaço para `kcal` novas
@@ -192,11 +211,13 @@ export function MealPlan() {
     // Prefere uma sugestão do mesmo período do dia que ainda não está no plano; se acabarem, repete.
     // (Com o backend, quem escolhe os alimentos é o assistente de IA, como no plano base.)
     const period = mealPeriod(mealTime);
-    const inPeriod = (meal: (typeof mealAlternatives)[number]) => meal.periods.includes(period);
+    const inPeriod = (meal: MealAlternative) => meal.periods.includes(period);
     const suggestion =
       availableAlternatives.find(inPeriod) ??
-      [...mealAlternatives].sort(byRestriction).find(inPeriod) ??
-      mealAlternatives[0];
+      [...alternatives].sort(byRestriction).find(inPeriod) ??
+      alternatives[0] ??
+      // Sem sugestões do backend o botão "Nova refeição" fica desativado; isto só evita quebrar.
+      { title: "", periods: [], foods: [] };
 
     const dayKcal = sumTotals(permanentPlan.map((meal) => meal.totals)).kcal;
     const suggestedKcal = sumTotals(suggestion.foods).kcal;
@@ -357,7 +378,8 @@ export function MealPlan() {
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90"
+          disabled={alternatives.length === 0}
+          className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus size={16} /> Nova refeição
         </button>
@@ -538,6 +560,7 @@ export function MealPlan() {
         open={addingFoodMeal !== undefined}
         mealTitle={addingFoodMeal?.title ?? ""}
         feedback={feedback}
+        catalog={catalog}
         preview={(foodName) => (addingFoodMeal ? planFood(addingFoodMeal.id, foodName) : null)}
         onConfirm={(foodName) => addingFoodMeal && addFood(addingFoodMeal.id, foodName)}
         onCancel={() => setAddingFoodTo(null)}

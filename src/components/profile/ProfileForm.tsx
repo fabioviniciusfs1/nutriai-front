@@ -73,6 +73,7 @@ export function ProfileForm() {
   const [mealsPerDay, setMealsPerDay] = useState<Profile["mealsPerDay"] | null>(saved?.mealsPerDay ?? null);
   const [weighInDay, setWeighInDay] = useState<Profile["weighInDay"] | null>(saved?.weighInDay ?? null);
   const [showErrors, setShowErrors] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const numberErrors = Object.fromEntries(
     NUMERIC_FIELDS.map((field) => {
@@ -108,7 +109,7 @@ export function ProfileForm() {
 
   const estimate = profile ? calculateCalorieTarget(profile) : null;
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!profile) {
       setShowErrors(true);
@@ -119,8 +120,11 @@ export function ProfileForm() {
       });
       return;
     }
-    saveProfile(profile);
-    router.push("/");
+    setSaving(true);
+    const ok = await saveProfile(profile);
+    setSaving(false);
+    // Se falhar, o aviso de erro aparece e o usuário continua no formulário.
+    if (ok) router.push("/");
   }
 
   return (
@@ -308,7 +312,8 @@ export function ProfileForm() {
 
         <button
           type="submit"
-          className="mt-5 w-full rounded-full bg-accent py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
+          disabled={saving}
+          className="mt-5 w-full rounded-full bg-accent py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
         >
           {saved ? "Salvar alterações" : "Salvar e continuar"}
         </button>

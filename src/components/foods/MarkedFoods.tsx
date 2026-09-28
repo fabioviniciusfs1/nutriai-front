@@ -4,8 +4,9 @@ import { useState } from "react";
 import { ArrowRight, Undo2 } from "lucide-react";
 import { FOOD_FEEDBACK } from "@/lib/food-feedback";
 import { releaseFood, useAuth } from "@/lib/auth";
-import { catalogEntry } from "@/lib/food-substitution";
-import { FOOD_GROUPS } from "@/lib/mock-data";
+import { FOOD_GROUPS } from "@/lib/food-groups";
+import { useApiQuery } from "@/lib/api/query";
+import type { CatalogFood } from "@/lib/api/types";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 
 // Alimentos que o usuário marcou como "Não gosto / Não quero / Não tenho". Enquanto marcados, o
@@ -16,6 +17,8 @@ export function MarkedFoods() {
   const feedback = auth?.foodFeedback ?? {};
   const substitutes = auth?.foodSubstitutes ?? {};
   const [releasing, setReleasing] = useState<string | null>(null);
+  // Só para mostrar o grupo de cada alimento; a lista aparece mesmo sem o catálogo.
+  const catalog = useApiQuery<CatalogFood[]>("/foods").data ?? [];
 
   const total = Object.keys(feedback).length;
 
@@ -31,8 +34,8 @@ export function MarkedFoods() {
 
       {total === 0 && (
         <div className="rounded-2xl bg-white p-8 text-center text-sm text-neutral-500 shadow-sm">
-          Nenhum alimento marcado. Use os botões &ldquo;Não gosto&rdquo;, &ldquo;Não quero&rdquo; ou &ldquo;Não
-          tenho&rdquo; nos alimentos do plano alimentar.
+          Nenhum alimento marcado. Use o botão &ldquo;Substituir alimento&rdquo; nos alimentos do plano
+          alimentar.
         </div>
       )}
 
@@ -57,7 +60,7 @@ export function MarkedFoods() {
                 ) : (
                   <ul className="mt-3 flex flex-col divide-y divide-neutral-100">
                     {foods.map((name) => {
-                      const group = catalogEntry(name)?.group;
+                      const group = catalog.find((food) => food.name === name)?.group;
                       return (
                         <li key={name} className="flex items-center gap-3 py-3">
                           <div className="min-w-0 flex-1">

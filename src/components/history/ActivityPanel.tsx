@@ -3,16 +3,12 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, type TooltipContentProps } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { Smartphone } from "lucide-react";
-import { activitySources, type activityHistory } from "@/lib/mock-data";
-import { formatLongDate, formatShortDate, numberFormat } from "@/components/history/format";
-
-function average(values: number[]) {
-  return Math.round(values.reduce((total, value) => total + value, 0) / values.length);
-}
+import type { ActivityDay, ActivitySource } from "@/lib/api/types";
+import { average, formatDateTime, formatLongDate, formatShortDate, numberFormat } from "@/components/history/format";
 
 function StepsTooltip({ active, payload, label }: TooltipContentProps<ValueType, NameType>) {
   if (!active || !payload?.length) return null;
-  const day = payload[0].payload as (typeof activityHistory)[number];
+  const day = payload[0].payload as ActivityDay;
 
   return (
     <div className="rounded-xl bg-neutral-800/95 p-3 text-sm text-white shadow-lg">
@@ -25,7 +21,7 @@ function StepsTooltip({ active, payload, label }: TooltipContentProps<ValueType,
   );
 }
 
-export function ActivityPanel({ days }: { days: typeof activityHistory }) {
+export function ActivityPanel({ days, sources }: { days: ActivityDay[]; sources: ActivitySource[] }) {
   const metrics = [
     { label: "Passos por dia", value: numberFormat.format(average(days.map((d) => d.steps))), unit: "" },
     { label: "Calorias ativas por dia", value: numberFormat.format(average(days.map((d) => d.activeCalories))), unit: "kcal" },
@@ -45,7 +41,7 @@ export function ActivityPanel({ days }: { days: typeof activityHistory }) {
           <p className="mt-1 text-xs text-neutral-500">Dados sincronizados de aplicativos de saúde</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {activitySources.map((source) => (
+          {sources.map((source) => (
             <span
               key={source.name}
               className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-xs text-neutral-600"
@@ -55,7 +51,7 @@ export function ActivityPanel({ days }: { days: typeof activityHistory }) {
               {source.connected ? (
                 <span className="text-neutral-500">
                   <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 align-middle" />
-                  Sincronizado {source.lastSync}
+                  Sincronizado{source.lastSync && ` ${formatDateTime(source.lastSync)}`}
                 </span>
               ) : (
                 <span className="text-neutral-400">Não conectado</span>

@@ -2,36 +2,39 @@
 
 import { useState } from "react";
 import { Send, Sparkles } from "lucide-react";
-import { chatFallbackReplies, chatSuggestions, initialChatMessages } from "@/lib/mock-data";
 import { getInitials, useAuth } from "@/lib/auth";
-
-type Message = {
-  id: number;
-  role: "assistant" | "user";
-  text: string;
-};
+import { ApiError, apiFetch } from "@/lib/api/client";
+import { useApiQuery } from "@/lib/api/query";
+import type { ChatMessage } from "@/lib/api/types";
+import { Spinner } from "@/components/api/QueryStatus";
 
 export function ChatPanel() {
-  const [messages, setMessages] = useState<Message[]>(initialChatMessages);
+  const history = useApiQuery<ChatMessage[]>("/chat/messages");
+  const suggestions = useApiQuery<string[]>("/chat/suggestions").data ?? [];
+  // Mensagens desta visita, depois do histórico carregado do backend.
+  const [sent, setSent] = useState<ChatMessage[]>([]);
+  const [waiting, setWaiting] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const userName = useAuth()?.user?.name ?? "";
-  const firstName = userName.split(" ")[0];
+  const messages = [...(history.data ?? []), ...sent];
 
-  function sendMessage(text: string) {
+  async function sendMessage(text: string) {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || waiting) return;
 
-    const userMessage: Message = { id: Date.now(), role: "user", text: trimmed };
-    const reply =
-      chatFallbackReplies[Math.floor(Math.random() * chatFallbackReplies.length)];
-    const assistantMessage: Message = {
-      id: Date.now() + 1,
-      role: "assistant",
-      text: reply,
-    };
-
-    setMessages((prev) => [...prev, userMessage, assistantMessage]);
+    setSent((prev) => [...prev, { id: `local-${Date.now()}`, role: "user", text: trimmed }]);
     setInput("");
+    setSendError(null);
+    setWaiting(true);
+    try {
+      const reply = await apiFetch<ChatMessage>("/chat/messages", { method: "POST", body: { text: trimmed } });
+      setSent((prev) => [...prev, reply]);
+    } catch (error) {
+      setSendError(error instanceof ApiError ? error.message : "Erro inesperado.");
+    } finally {
+      setWaiting(false);
+    }
   }
 
   return (
@@ -74,16 +77,38 @@ export function ChatPanel() {
                     : "bg-neutral-100 text-neutral-700"
                 }`}
               >
-                {message.text.replace("{nome}", firstName)}
+                {message.text}
               </div>
             </div>
           ))}
+          {history.loading && (
+            <div className="flex justify-center">
+              <Spinner className="h-6 w-6" />
+            </div>
+          )}
+          {history.error && (
+            <p className="text-center text-sm text-neutral-500">
+              Não foi possível carregar as conversas anteriores: {history.error.message}{" "}
+              <button type="button" onClick={history.reload} className="font-medium text-accent hover:underline">
+                Tentar novamente
+              </button>
+            </p>
+          )}
+          {waiting && (
+            <div className="flex items-end gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+                <Sparkles size={14} />
+              </div>
+              <div className="rounded-2xl bg-neutral-100 px-4 py-2.5 text-sm text-neutral-500">Digitando…</div>
+            </div>
+          )}
+          {sendError && <p className="text-center text-sm text-red-600">Mensagem não enviada: {sendError}</p>}
         </div>
 
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            sendMessage(input);
+            void sendMessage(input);
           }}
           className="flex items-center gap-2 border-t border-neutral-100 pt-4"
         >
@@ -97,7 +122,8 @@ export function ChatPanel() {
           <button
             type="submit"
             aria-label="Enviar mensagem"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-white hover:bg-accent/90"
+            disabled={waiting}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-white hover:bg-accent/90 disabled:opacity-60"
           >
             <Send size={16} />
           </button>
@@ -107,11 +133,12 @@ export function ChatPanel() {
       <div className="rounded-2xl bg-white p-5 shadow-sm">
         <h3 className="font-semibold text-neutral-900">Sugestões</h3>
         <div className="mt-4 flex flex-col gap-2">
-          {chatSuggestions.map((suggestion) => (
+          {suggestions.length === 0 && <p className="text-sm text-neutral-400">Nenhuma sugestão no momento.</p>}
+          {suggestions.map((suggestion) => (
             <button
               key={suggestion}
               type="button"
-              onClick={() => sendMessage(suggestion)}
+              onClick={() => void sendMessage(suggestion)}
               className="rounded-xl bg-neutral-100 px-4 py-3 text-left text-sm text-neutral-600 transition-colors hover:bg-neutral-200"
             >
               {suggestion}
