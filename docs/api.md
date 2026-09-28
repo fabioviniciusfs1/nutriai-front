@@ -56,6 +56,62 @@ Resposta `201`: `{ "token": "..." }`. O usuário nasce sem perfil.
 Resposta `200`: `{ "token": "..." }`. Credenciais erradas → `401` `{ "error": "Usuário ou senha incorretos." }`.
 Logout é só no front (descarta o token).
 
+### Login com Google (e acesso à Google Health API)
+
+O backend conduz todo o OAuth com o Google e guarda os tokens do usuário para chamar a Google Health API
+depois. O front só redireciona o navegador e, na volta, troca um código de uso único pelo token da sessão.
+
+```
+Front /login ──► GET {API}/auth/google/start?redirect_uri&state ──► Google (consentimento)
+      ▲                                                                   │
+      │                      GET {API}/auth/google/callback  ◄────────────┘
+      │                        (troca o code com o Google, cria/acha o usuário, guarda os tokens)
+      └── {redirect_uri}?code=<uso único>&state=...   (ou ?error=...&state=...)
+Front /login/google ──► POST {API}/auth/google/exchange ──► { token }
+```
+
+#### `GET /auth/google/start?redirect_uri=...&state=...`
+
+Navegação do navegador (não é `fetch`), responde `302` para o Google.
+
+- `redirect_uri`: a página de volta do front (`https://<front>/login/google`). **Aceite só origens de uma
+  lista permitida** (ex.: variável `FRONTEND_URLS`); senão, responda `400`.
+- `state`: valor aleatório do front. Guarde junto com o `redirect_uri` (ex.: no `state` que o backend manda ao
+  Google, assinado, ou num cookie `HttpOnly` de curta duração) e devolva igual na volta.
+- Na URL do Google use o callback **do backend** (registrado no Google Cloud Console), `response_type=code`,
+  `access_type=offline` e `prompt=consent` (para receber o refresh token), e os escopos `openid email profile`
+  mais os escopos de leitura da Google Health API que o app usa (atividade, calorias gastas…) — confira os
+  nomes na documentação da Google Health API.
+
+#### `GET /auth/google/callback` (do backend, chamado pelo Google)
+
+1. Troca o `code` do Google pelos tokens e valida o `id_token`.
+2. Encontra o usuário pelo `sub` do Google ou cria um novo (nome do Google; `username` gerado, ex.: a partir
+   do e-mail). O usuário novo nasce sem perfil, como no cadastro.
+3. Guarda o refresh token (criptografado) para a Google Health API.
+4. Gera um **código de uso único** (válido por ~1 minuto, ligado a esse usuário e ao `redirect_uri`) e
+   redireciona para `{redirect_uri}?code=<código>&state=<state>`.
+
+Se o usuário cancelar (o Google devolve `error=access_denied`) ou algo falhar, redirecione para
+`{redirect_uri}?error=<mensagem em pt-BR>&state=<state>` (ex.: `Login com o Google cancelado.`). O front mostra
+a mensagem como está.
+
+Não coloque o token da sessão na URL: ela fica no histórico do navegador e em logs.
+
+#### `POST /auth/google/exchange`
+
+```json
+{ "code": "<código de uso único>", "redirectUri": "https://<front>/login/google" }
+```
+
+Resposta `200`: `{ "token": "..." }`, igual ao login. Código inválido, expirado, já usado ou com outro
+`redirectUri` → `400` `{ "error": "O login com o Google expirou. Tente novamente." }`.
+
+#### Dados da Google Health API
+
+Com os tokens guardados, o backend busca os dados de saúde do usuário e os usa em `/history/activity`,
+`burnedKcal` de `/nutrition/today` e `/activity-sources` (com `connected: true` e o `lastSync`).
+
 ## Usuário e perfil 🔒
 
 ### `GET /me` → `Me`

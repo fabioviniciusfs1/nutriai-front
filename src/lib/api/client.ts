@@ -4,6 +4,11 @@ import { useSyncExternalStore } from "react";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 const TOKEN_KEY = "nutriai:token";
 
+/** URL completa de uma rota do backend (para redirecionar o navegador, fora do `fetch`). */
+export function apiUrl(path: string) {
+  return `${API_URL}${path}`;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,

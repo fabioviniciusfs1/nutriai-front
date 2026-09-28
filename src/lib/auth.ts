@@ -1,5 +1,5 @@
 // Sessão: o token fica no localStorage e os dados do usuário vêm de `GET /me`.
-import { ApiError, apiFetch, setToken, useToken } from "@/lib/api/client";
+import { ApiError, apiFetch, apiUrl, setToken, useToken } from "@/lib/api/client";
 import { mutate, useApiQuery } from "@/lib/api/query";
 import type { AuthResponse, Me, Targets } from "@/lib/api/types";
 import type { Profile } from "@/lib/profile";
@@ -65,6 +65,48 @@ async function authenticate(path: string, body: unknown): Promise<Result> {
   } catch (error) {
     return { ok: false, error: error instanceof ApiError ? error.message : "Erro inesperado." };
   }
+}
+
+// Login com Google: o backend conduz o OAuth (e guarda o acesso à Google Health API). O front só
+// manda o navegador para o backend e, na volta em /login/google, troca o código de uso único pelo token.
+const GOOGLE_STATE_KEY = "nutriai:google-state";
+
+/** Página para onde o backend devolve o navegador depois do Google. */
+function googleRedirectUri() {
+  return `${window.location.origin}/login/google`;
+}
+
+/** Sai do app e vai para a tela de consentimento do Google (via backend). */
+export function signInWithGoogle() {
+  // `state` aleatório: na volta, confirma que o login foi iniciado por esta aba (evita CSRF de login).
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const state = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  try {
+    window.sessionStorage.setItem(GOOGLE_STATE_KEY, state);
+  } catch {
+    // Sem sessionStorage a volta falha na verificação e o usuário vê o erro.
+  }
+  const params = new URLSearchParams({ redirect_uri: googleRedirectUri(), state });
+  window.location.assign(apiUrl(`/auth/google/start?${params}`));
+}
+
+/** Volta do Google: `?code=...&state=...` em caso de sucesso, `?error=...` se falhou ou foi cancelado. */
+export async function completeGoogleSignIn(params: URLSearchParams): Promise<Result> {
+  let expectedState: string | null = null;
+  try {
+    expectedState = window.sessionStorage.getItem(GOOGLE_STATE_KEY);
+    window.sessionStorage.removeItem(GOOGLE_STATE_KEY);
+  } catch {
+    // Tratado abaixo como estado inválido.
+  }
+
+  const error = params.get("error");
+  if (error) return { ok: false, error };
+  const code = params.get("code");
+  if (!code || !expectedState || params.get("state") !== expectedState) {
+    return { ok: false, error: "Não foi possível confirmar o login com o Google. Tente novamente." };
+  }
+  return authenticate("/auth/google/exchange", { code, redirectUri: googleRedirectUri() });
 }
 
 export function signOut() {
