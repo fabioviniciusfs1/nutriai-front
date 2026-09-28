@@ -1,37 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
 import type { PlanFood } from "@/lib/food-substitution";
 
 type FoodFeedbackDialogProps = {
   open: boolean;
   foodName: string;
-  /** "Não gosto", "Não quero" ou "Não tenho". */
-  feedbackLabel: string;
-  /** "Não quero": nome da única refeição onde a troca vale. `null` = todas as refeições. */
-  onlyThisMeal: string | null;
+  /** Refeição onde o botão foi clicado; "Não quero" troca só nela. */
+  mealTitle: string;
   /** Substitutos já na porção com as mesmas calorias do alimento marcado. */
   options: PlanFood[];
-  onConfirm: (substitute: string | null) => void;
+  onConfirm: (reason: FoodFeedback, substitute: string | null) => void;
   onCancel: () => void;
 };
 
-export function FoodFeedbackDialog({
-  open,
-  foodName,
-  feedbackLabel,
-  onlyThisMeal,
-  options,
-  onConfirm,
-  onCancel,
-}: FoodFeedbackDialogProps) {
+export function FoodFeedbackDialog({ open, foodName, mealTitle, options, onConfirm, onCancel }: FoodFeedbackDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [reason, setReason] = useState<FoodFeedback | null>(null);
   const [choice, setChoice] = useState<string | null>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) {
+      setReason(null);
       setChoice(null);
       dialog.showModal();
     }
@@ -39,6 +32,11 @@ export function FoodFeedbackDialog({
   }, [open]);
 
   const hasOptions = options.length > 0;
+  const descriptions: Record<FoodFeedback, string> = {
+    "nao-gosto": `${foodName} sai de todas as refeições, também nos próximos dias.`,
+    "nao-quero": `${foodName} sai só de “${mealTitle}”, também nos próximos dias. As outras refeições continuam com ele.`,
+    "nao-tenho": `${foodName} sai de todas as refeições, também nos próximos dias.`,
+  };
 
   return (
     <dialog
@@ -56,32 +54,49 @@ export function FoodFeedbackDialog({
         className="p-5"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!hasOptions) onConfirm(null);
-          else if (choice) onConfirm(choice);
+          if (!reason) return;
+          if (!hasOptions) onConfirm(reason, null);
+          else if (choice) onConfirm(reason, choice);
         }}
       >
-        <h4 className="font-semibold text-neutral-900">
-          Marcar &ldquo;{foodName}&rdquo; como &ldquo;{feedbackLabel}&rdquo;?
-        </h4>
-        <p className="mt-1 text-sm text-neutral-600">
-          {onlyThisMeal ? (
-            <>
-              {foodName} sai só de &ldquo;{onlyThisMeal}&rdquo;, também nos próximos dias. As outras refeições
-              continuam com ele.{" "}
-            </>
-          ) : (
-            <>{foodName} sai de todas as refeições.{" "}</>
-          )}
+        <h4 className="font-semibold text-neutral-900">Substituir alimento?</h4>
+        <p className="mt-1 text-sm text-neutral-600">Por que trocar &ldquo;{foodName}&rdquo;?</p>
+
+        <fieldset className="mt-4 flex min-w-0 flex-col gap-2">
+          <legend className="sr-only">Motivo da troca</legend>
+          {FOOD_FEEDBACK.map(({ id, label, Icon }) => (
+            <label
+              key={id}
+              className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition-colors ${
+                reason === id ? "border-accent bg-accent/5" : "border-neutral-200 hover:bg-neutral-50"
+              }`}
+            >
+              <input
+                type="radio"
+                name="food-feedback-reason"
+                value={id}
+                checked={reason === id}
+                onChange={() => setReason(id)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-neutral-900">
+                  <Icon size={15} className="text-neutral-400" /> {label}
+                </span>
+                <span className="mt-0.5 block text-xs text-neutral-500">{descriptions[id]}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+
+        <p className="mt-4 text-sm text-neutral-600">
           {hasOptions
             ? "Escolha um substituto, com as mesmas calorias:"
             : "Não há outros alimentos do mesmo grupo disponíveis, então ele sairá sem substituto."}
         </p>
-        <p className="mt-1 text-xs text-neutral-500">
-          O assistente deixa de recomendar {foodName} até você liberar na página Alimentos.
-        </p>
 
         {hasOptions && (
-          <fieldset className="mt-4 flex min-w-0 flex-col gap-2">
+          <fieldset className="mt-2 flex min-w-0 flex-col gap-2">
             <legend className="sr-only">Substituto</legend>
             {options.map((option) => (
               <label
@@ -113,6 +128,10 @@ export function FoodFeedbackDialog({
           </fieldset>
         )}
 
+        <p className="mt-3 text-xs text-neutral-500">
+          O assistente deixa de recomendar {foodName} até você liberar na página Alimentos.
+        </p>
+
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
@@ -123,7 +142,7 @@ export function FoodFeedbackDialog({
           </button>
           <button
             type="submit"
-            disabled={hasOptions && choice === null}
+            disabled={reason === null || (hasOptions && choice === null)}
             className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Confirmar
