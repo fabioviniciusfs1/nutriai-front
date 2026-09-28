@@ -17,6 +17,19 @@ export const GOALS = [
   { id: "ganhar", label: "Ganhar peso", description: "Superávit de 300 kcal/dia", adjustment: 300 },
 ] as const;
 
+export const MEALS_PER_DAY = [3, 4, 5, 6] as const;
+
+/** `id` segue `Date.getDay()` (0 = domingo); a lista começa na segunda. */
+export const WEEKDAYS = [
+  { id: 1, label: "Segunda" },
+  { id: 2, label: "Terça" },
+  { id: 3, label: "Quarta" },
+  { id: 4, label: "Quinta" },
+  { id: 5, label: "Sexta" },
+  { id: 6, label: "Sábado" },
+  { id: 0, label: "Domingo" },
+] as const;
+
 export type Profile = {
   sex: (typeof SEXES)[number]["id"];
   age: number;
@@ -24,6 +37,10 @@ export type Profile = {
   heightCm: number;
   activityLevel: (typeof ACTIVITY_LEVELS)[number]["id"];
   goal: (typeof GOALS)[number]["id"];
+  /** Quantas refeições a pessoa consegue fazer por dia. */
+  mealsPerDay: (typeof MEALS_PER_DAY)[number];
+  /** Dia da semana em que o app lembra de registrar o peso. */
+  weighInDay: (typeof WEEKDAYS)[number]["id"];
 };
 
 // Pisos usuais para dietas sem acompanhamento médico.

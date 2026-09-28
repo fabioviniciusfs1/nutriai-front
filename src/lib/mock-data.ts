@@ -17,8 +17,9 @@ export type Nutrient = {
   limit?: boolean;
 };
 
+export const fibers: Nutrient[] = [{ name: "Fibras", atual: 22, meta: 30, unit: "g" }];
+
 export const otherMacros: Nutrient[] = [
-  { name: "Fibras", atual: 22, meta: 30, unit: "g" },
   { name: "Açúcares", atual: 38, meta: 50, unit: "g", limit: true },
   { name: "Gordura saturada", atual: 16, meta: 20, unit: "g", limit: true },
   { name: "Colesterol", atual: 210, meta: 300, unit: "mg", limit: true },
@@ -296,6 +297,7 @@ export const nutrientGroups: { name: string; nutrients: Nutrient[] }[] = [
     name: "Macronutrientes",
     nutrients: [
       ...macroBreakdown.map(({ name, atual, meta }) => ({ name, atual, meta, unit: "g" })),
+      ...fibers,
       ...otherMacros,
     ],
   },

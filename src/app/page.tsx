@@ -2,6 +2,7 @@ import { AuthGuard } from "@/components/auth/AuthGuard";
 import { Topbar } from "@/components/dashboard/Topbar";
 import { MacroDonut } from "@/components/dashboard/MacroDonut";
 import { MealPlan } from "@/components/dashboard/MealPlan";
+import { WeighInReminder } from "@/components/dashboard/WeighInReminder";
 
 export default function Home() {
   return (
@@ -10,6 +11,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4">
           <Topbar />
 
+          <WeighInReminder />
           <MacroDonut />
           <MealPlan />
         </div>

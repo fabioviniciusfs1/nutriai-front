@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Flame, Wheat, Drumstick, Droplet, Plus, PlusCircle, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Clock, Flame, Wheat, Drumstick, Droplet, Plus, PlusCircle, Trash2 } from "lucide-react";
 import { mealAlternatives, mealPeriod, mealPlan } from "@/lib/mock-data";
-import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
+import type { FoodFeedback } from "@/lib/food-feedback";
 import { FoodFeedbackDialog } from "@/components/dashboard/FoodFeedbackDialog";
 import { convertFood, resolveFoods, substituteOptions, usesRestrictedFood } from "@/lib/food-substitution";
 import { TimePickerDialog } from "@/components/dashboard/TimePickerDialog";
@@ -86,18 +86,16 @@ export function MealPlan() {
     mealTitle: string;
     foodName: string;
     kcal: number;
-    value: FoodFeedback;
   } | null>(null);
 
-  function confirmFeedback(substitute: string | null) {
+  function confirmFeedback(reason: FoodFeedback, substitute: string | null) {
     if (!pending) return;
     // "Não quero" troca só nesta refeição; "Não gosto" e "Não tenho", em todas. As duas são permanentes.
-    if (pending.value === "nao-quero") markFoodInMeal(pending.mealId, pending.foodName, substitute);
-    else markFoodEverywhere(pending.foodName, pending.value, substitute);
+    if (reason === "nao-quero") markFoodInMeal(pending.mealId, pending.foodName, substitute);
+    else markFoodEverywhere(pending.foodName, reason, substitute);
     setPending(null);
   }
 
-  const pendingLabel = FOOD_FEEDBACK.find((item) => item.id === pending?.value)?.label ?? "";
   const pendingOptions = pending ? substituteOptions(pending.foodName, pending.kcal, feedback) : [];
 
   /**
@@ -441,7 +439,7 @@ export function MealPlan() {
                   <span>Prot.</span>
                   <span>Gord.</span>
                   <span>Kcal</span>
-                  <span className="w-[7.75rem]" aria-hidden />
+                  <span className="w-[3.75rem]" aria-hidden />
                 </div>
                 {meal.foods.map((food, index) => {
                   const { extraIndex } = food;
@@ -471,21 +469,18 @@ export function MealPlan() {
                         <span className="text-xs text-neutral-400 sm:hidden">Kcal</span>
                         {food.kcal}
                       </span>
-                      <div className="col-span-4 flex items-center gap-1 sm:col-span-1 sm:w-[7.75rem]">
-                        {FOOD_FEEDBACK.map(({ id, label, Icon }) => (
-                          <button
-                            key={id}
-                            type="button"
-                            title={label}
-                            aria-label={`${label}: ${food.name}`}
-                            onClick={() =>
-                              setPending({ mealId: meal.id, mealTitle: meal.title, foodName: food.name, kcal: food.kcal, value: id })
-                            }
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                          >
-                            <Icon size={15} />
-                          </button>
-                        ))}
+                      <div className="col-span-4 flex items-center gap-1 sm:col-span-1 sm:w-[3.75rem]">
+                        <button
+                          type="button"
+                          title="Substituir alimento"
+                          aria-label={`Substituir alimento: ${food.name}`}
+                          onClick={() =>
+                            setPending({ mealId: meal.id, mealTitle: meal.title, foodName: food.name, kcal: food.kcal })
+                          }
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                        >
+                          <ArrowLeftRight size={15} />
+                        </button>
                         {extraIndex !== null && (
                           <button
                             type="button"
@@ -551,8 +546,7 @@ export function MealPlan() {
       <FoodFeedbackDialog
         open={pending !== null}
         foodName={pending?.foodName ?? ""}
-        feedbackLabel={pendingLabel}
-        onlyThisMeal={pending?.value === "nao-quero" ? pending.mealTitle : null}
+        mealTitle={pending?.mealTitle ?? ""}
         options={pendingOptions}
         onConfirm={confirmFeedback}
         onCancel={() => setPending(null)}

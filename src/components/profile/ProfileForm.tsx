@@ -6,7 +6,9 @@ import { saveProfile, useAuth } from "@/lib/auth";
 import {
   ACTIVITY_LEVELS,
   GOALS,
+  MEALS_PER_DAY,
   SEXES,
+  WEEKDAYS,
   calculateCalorieTarget,
   calculateWaterLiters,
   type Profile,
@@ -68,6 +70,8 @@ export function ProfileForm() {
   });
   const [activityLevel, setActivityLevel] = useState<Profile["activityLevel"] | null>(saved?.activityLevel ?? null);
   const [goal, setGoal] = useState<Profile["goal"] | null>(saved?.goal ?? null);
+  const [mealsPerDay, setMealsPerDay] = useState<Profile["mealsPerDay"] | null>(saved?.mealsPerDay ?? null);
+  const [weighInDay, setWeighInDay] = useState<Profile["weighInDay"] | null>(saved?.weighInDay ?? null);
   const [showErrors, setShowErrors] = useState(false);
 
   const numberErrors = Object.fromEntries(
@@ -84,7 +88,12 @@ export function ProfileForm() {
   ) as Record<NumericKey, string | null>;
 
   const profile: Profile | null =
-    sex && activityLevel && goal && Object.values(numberErrors).every((error) => error === null)
+    sex &&
+    activityLevel &&
+    goal &&
+    mealsPerDay !== null &&
+    weighInDay !== null &&
+    Object.values(numberErrors).every((error) => error === null)
       ? {
           sex,
           age: parseNumber(numbers.age)!,
@@ -92,6 +101,8 @@ export function ProfileForm() {
           heightCm: parseNumber(numbers.heightCm)!,
           activityLevel,
           goal,
+          mealsPerDay,
+          weighInDay,
         }
       : null;
 
@@ -207,6 +218,44 @@ export function ProfileForm() {
               ))}
             </div>
             {showErrors && !goal && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
+          </fieldset>
+        </section>
+
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h3 className="font-semibold text-neutral-900">Rotina</h3>
+
+          <fieldset className="mt-4" data-invalid={showErrors && mealsPerDay === null ? true : undefined}>
+            <legend className="text-sm font-medium text-neutral-700">Refeições por dia</legend>
+            <p className="text-xs text-neutral-500">Quantas refeições você consegue fazer no dia.</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {MEALS_PER_DAY.map((count) => (
+                <OptionCard
+                  key={count}
+                  name="mealsPerDay"
+                  label={`${count} refeições`}
+                  checked={mealsPerDay === count}
+                  onChange={() => setMealsPerDay(count)}
+                />
+              ))}
+            </div>
+            {showErrors && mealsPerDay === null && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
+          </fieldset>
+
+          <fieldset className="mt-4" data-invalid={showErrors && weighInDay === null ? true : undefined}>
+            <legend className="text-sm font-medium text-neutral-700">Lembrete de pesagem</legend>
+            <p className="text-xs text-neutral-500">Dia da semana em que o app vai lembrar você de registrar o peso.</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+              {WEEKDAYS.map((day) => (
+                <OptionCard
+                  key={day.id}
+                  name="weighInDay"
+                  label={day.label}
+                  checked={weighInDay === day.id}
+                  onChange={() => setWeighInDay(day.id)}
+                />
+              ))}
+            </div>
+            {showErrors && weighInDay === null && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
           </fieldset>
         </section>
       </div>
