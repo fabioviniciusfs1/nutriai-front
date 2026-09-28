@@ -14,7 +14,11 @@ import {
 } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { Plus, Scale } from "lucide-react";
-import { addWeightEntry, useAuth, type WeightEntry } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import { useApiQuery } from "@/lib/api/query";
+import { addWeightEntry, WEIGHTS_PATH } from "@/lib/api/actions";
+import type { WeightEntry } from "@/lib/api/types";
+import { QueryStatus } from "@/components/api/QueryStatus";
 import { WeightDialog } from "@/components/history/WeightDialog";
 
 const LINE_COLOR = "#8b5cf6";
@@ -77,9 +81,15 @@ type WeightChartProps = {
 };
 
 export function WeightChart({ period }: WeightChartProps) {
+  const weights = useApiQuery<WeightEntry[]>(WEIGHTS_PATH);
+  if (!weights.data) return <QueryStatus title="Peso" error={weights.error} onRetry={weights.reload} />;
+  return <WeightChartCard period={period} entries={weights.data} />;
+}
+
+/** `entries` do mais antigo para o mais recente. */
+function WeightChartCard({ period, entries }: WeightChartProps & { entries: WeightEntry[] }) {
   const auth = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const entries: WeightEntry[] = auth?.weights ?? [];
   const profileKg = auth?.profile?.weightKg;
 
   // O eixo termina no momento em que a página abriu, ou no último registro se ele for mais recente.
@@ -186,9 +196,8 @@ export function WeightChart({ period }: WeightChartProps) {
       <WeightDialog
         open={dialogOpen}
         lastKg={lastEntry?.kg}
-        onConfirm={(kg, at) => {
-          addWeightEntry(kg, at);
-          setDialogOpen(false);
+        onConfirm={async (kg, at) => {
+          if (await addWeightEntry(kg, at)) setDialogOpen(false);
         }}
         onCancel={() => setDialogOpen(false)}
       />

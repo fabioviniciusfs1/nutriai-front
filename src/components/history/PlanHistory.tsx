@@ -20,8 +20,6 @@ export function PlanHistory() {
 
       <ul className="mt-4 flex flex-col gap-3">
         {planHistory.map((plan) => {
-          const followed = plan.meals.filter((meal) => meal.followed).length;
-          const plannedKcal = plan.meals.reduce((total, meal) => total + meal.kcal, 0);
 
           return (
             <li key={plan.date}>
@@ -31,9 +29,9 @@ export function PlanHistory() {
                     <span className="font-medium text-neutral-900">{formatLongDate(plan.date)}</span>
                     <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-neutral-500">
                       <span>
-                        {followed}/{plan.meals.length} refeições seguidas
+                        {plan.followedCount}/{plan.meals.length} refeições seguidas
                       </span>
-                      <span>{numberFormat.format(plannedKcal)} kcal planejadas</span>
+                      <span>{numberFormat.format(plan.plannedKcal)} kcal planejadas</span>
                       {plan.flaggedFoods.length > 0 && (
                         <span className="rounded-full bg-accent/10 px-2 py-0.5 font-medium text-accent">
                           {plan.flaggedFoods.length} {plan.flaggedFoods.length === 1 ? "alimento marcado" : "alimentos marcados"}

@@ -1,4 +1,6 @@
 // Cliente HTTP do backend. A URL vem de NEXT_PUBLIC_API_URL, embutida no bundle no `next build`.
+import { useSyncExternalStore } from "react";
+
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 const TOKEN_KEY = "nutriai:token";
 
@@ -40,6 +42,27 @@ export function onTokenChange(listener: () => void) {
   };
 }
 
+// Login/logout em outra aba muda o token no localStorage.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key === TOKEN_KEY || event.key === null) tokenListeners.forEach((listener) => listener());
+  });
+}
+
+/** Token atual; `undefined` no servidor e antes da hidratação. */
+export function useToken() {
+  return useSyncExternalStore(onTokenChange, getToken, () => undefined);
+}
+
+/** Fuso do usuário: o backend usa para saber qual é o "hoje" dele. */
+function timeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return "UTC";
+  }
+}
+
 /**
  * Chama o backend com o token da sessão. Erros viram `ApiError` com a mensagem do corpo
  * (`{ "error": "..." }`) quando houver. Um 401 encerra a sessão.
@@ -52,6 +75,7 @@ export async function apiFetch<T>(path: string, init: { method?: string; body?: 
       method: init.method ?? "GET",
       headers: {
         Accept: "application/json",
+        "X-Timezone": timeZone(),
         ...(init.body !== undefined && { "Content-Type": "application/json" }),
         ...(token && { Authorization: `Bearer ${token}` }),
       },

@@ -3,8 +3,8 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, type TooltipContentProps } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { Smartphone } from "lucide-react";
-import type { ActivityDay, ActivitySource } from "@/lib/api/types";
-import { average, formatDateTime, formatLongDate, formatShortDate, numberFormat } from "@/components/history/format";
+import type { ActivityDay, ActivityHistory, ActivitySource } from "@/lib/api/types";
+import { formatDateTime, formatLongDate, formatShortDate, numberFormat } from "@/components/history/format";
 
 function StepsTooltip({ active, payload, label }: TooltipContentProps<ValueType, NameType>) {
   if (!active || !payload?.length) return null;
@@ -21,16 +21,13 @@ function StepsTooltip({ active, payload, label }: TooltipContentProps<ValueType,
   );
 }
 
-export function ActivityPanel({ days, sources }: { days: ActivityDay[]; sources: ActivitySource[] }) {
+export function ActivityPanel({ activity, sources }: { activity: ActivityHistory; sources: ActivitySource[] }) {
+  const { days, averages } = activity;
   const metrics = [
-    { label: "Passos por dia", value: numberFormat.format(average(days.map((d) => d.steps))), unit: "" },
-    { label: "Calorias ativas por dia", value: numberFormat.format(average(days.map((d) => d.activeCalories))), unit: "kcal" },
-    { label: "Minutos ativos por dia", value: numberFormat.format(average(days.map((d) => d.activeMinutes))), unit: "min" },
-    {
-      label: "Distância no período",
-      value: numberFormat.format(Math.round(days.reduce((total, d) => total + d.distanceKm, 0))),
-      unit: "km",
-    },
+    { label: "Passos por dia", value: numberFormat.format(averages.steps), unit: "" },
+    { label: "Calorias ativas por dia", value: numberFormat.format(averages.activeCalories), unit: "kcal" },
+    { label: "Minutos ativos por dia", value: numberFormat.format(averages.activeMinutes), unit: "min" },
+    { label: "Distância no período", value: numberFormat.format(activity.totalDistanceKm), unit: "km" },
   ];
 
   return (

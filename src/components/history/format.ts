@@ -30,11 +30,6 @@ export function formatDateTime(iso: string) {
   return dateTime.format(new Date(iso)).replace(",", " às");
 }
 
-/** Média arredondada; 0 sem valores. */
-export function average(values: number[]) {
-  return values.length === 0 ? 0 : Math.round(values.reduce((total, value) => total + value, 0) / values.length);
-}
-
 export function formatSigned(value: number) {
   return `${value > 0 ? "+" : value < 0 ? "−" : ""}${numberFormat.format(Math.abs(value))}`;
 }

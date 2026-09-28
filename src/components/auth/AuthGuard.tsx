@@ -3,7 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
-import { dismissMutationError, retrySession, useAuth, useMutationError, useSessionError } from "@/lib/auth";
+import { useSession } from "@/lib/auth";
+import { dismissMutationError, useMutationError } from "@/lib/api/query";
 import { Spinner } from "@/components/api/QueryStatus";
 
 type AuthGuardProps = {
@@ -13,8 +14,7 @@ type AuthGuardProps = {
 };
 
 export function AuthGuard({ children, requireProfile = true }: AuthGuardProps) {
-  const auth = useAuth();
-  const sessionError = useSessionError();
+  const { auth, error: sessionError, retry } = useSession();
   const mutationError = useMutationError();
   const router = useRouter();
 
@@ -28,10 +28,10 @@ export function AuthGuard({ children, requireProfile = true }: AuthGuardProps) {
   if (auth === undefined && sessionError) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background p-4 text-center">
-        <p className="text-sm text-neutral-600">{sessionError}</p>
+        <p className="text-sm text-neutral-600">{sessionError.message}</p>
         <button
           type="button"
-          onClick={retrySession}
+          onClick={retry}
           className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
         >
           Tentar novamente

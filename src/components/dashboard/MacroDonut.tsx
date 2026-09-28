@@ -3,10 +3,9 @@
 import { MoreHorizontal, GlassWater, Flame } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useApiQuery } from "@/lib/api/query";
-import type { ActivityDay, NutritionToday } from "@/lib/api/types";
-import { consumedKcal, MACRO_STYLE } from "@/lib/nutrients";
+import type { NutritionToday } from "@/lib/api/types";
+import { MACRO_COLORS } from "@/lib/nutrients";
 import { QueryStatus } from "@/components/api/QueryStatus";
-import { calculateCalorieTarget, calculateWaterLiters } from "@/lib/calorie-target";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
 
 // Semicírculo de raio 80 centrado em (100, 100); `pathLength` 100 deixa o progresso em %.
@@ -16,18 +15,18 @@ const numberFormat = new Intl.NumberFormat("pt-BR");
 
 export function MacroDonut() {
   const nutrition = useApiQuery<NutritionToday>("/nutrition/today");
-  // Calorias gastas: último dia de atividade (Google Fit / Apple Saúde). Sem ele, o card mostra "—".
-  const activity = useApiQuery<ActivityDay[]>("/history/activity?days=1");
   if (!nutrition.data) return <QueryStatus title="Meta diária" error={nutrition.error} onRetry={nutrition.reload} />;
-  return <MacroDonutCard nutrition={nutrition.data} burned={activity.data?.at(-1)?.burned ?? null} />;
+  return <MacroDonutCard nutrition={nutrition.data} />;
 }
 
-function MacroDonutCard({ nutrition, burned }: { nutrition: NutritionToday; burned: number | null }) {
-  const profile = useAuth()?.profile;
-  const consumed = consumedKcal(nutrition);
-  const target = profile ? calculateCalorieTarget(profile).target : null;
+function MacroDonutCard({ nutrition }: { nutrition: NutritionToday }) {
+  // Metas do perfil (calculadas pelo backend) e consumo/gasto de hoje.
+  const targets = useAuth()?.targets;
+  const consumed = nutrition.consumedKcal;
+  const burned = nutrition.burnedKcal;
+  const target = targets?.calories ?? null;
   const calorieGoal = target ? `${numberFormat.format(target)} kcal` : "—";
-  const waterGoal = profile ? `${numberFormat.format(calculateWaterLiters(profile.weightKg))} L` : "—";
+  const waterGoal = targets ? `${numberFormat.format(targets.waterLiters)} L` : "—";
   const percent = target ? Math.round((consumed / target) * 100) : 0;
 
   return (
@@ -95,7 +94,7 @@ function MacroDonutCard({ nutrition, burned }: { nutrition: NutritionToday; burn
               atual={macro.atual}
               meta={macro.meta}
               unit="g"
-              color={MACRO_STYLE[macro.id]?.color}
+              color={MACRO_COLORS[macro.id]}
             />
           ))}
 

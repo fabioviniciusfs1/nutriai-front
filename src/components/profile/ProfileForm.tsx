@@ -1,18 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveProfile, useAuth } from "@/lib/auth";
-import {
-  ACTIVITY_LEVELS,
-  GOALS,
-  MEALS_PER_DAY,
-  SEXES,
-  WEEKDAYS,
-  calculateCalorieTarget,
-  calculateWaterLiters,
-  type Profile,
-} from "@/lib/calorie-target";
+import { ApiError, apiFetch } from "@/lib/api/client";
+import type { Targets } from "@/lib/api/types";
+import { ACTIVITY_LEVELS, GOALS, MEALS_PER_DAY, SEXES, WEEKDAYS, type Profile } from "@/lib/profile";
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
 
@@ -27,6 +20,33 @@ type NumericKey = (typeof NUMERIC_FIELDS)[number]["key"];
 function parseNumber(value: string) {
   const parsed = Number(value.replace(",", "."));
   return value.trim() === "" || Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Metas calculadas pelo backend para o perfil ainda não salvo, pedidas quando o usuário para de
+ * digitar. `undefined` enquanto calcula.
+ */
+function useEstimate(profile: Profile | null) {
+  const key = profile ? JSON.stringify(profile) : null;
+  const [result, setResult] = useState<{ key: string; targets?: Targets; error?: string } | null>(null);
+
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      apiFetch<Targets>("/profile/estimate", { method: "POST", body: JSON.parse(key) }).then(
+        (targets) => !cancelled && setResult({ key, targets }),
+        (error: unknown) =>
+          !cancelled && setResult({ key, error: error instanceof ApiError ? error.message : "Erro inesperado." })
+      );
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [key]);
+
+  return result?.key === key ? result : undefined;
 }
 
 function OptionCard({
@@ -107,7 +127,8 @@ export function ProfileForm() {
         }
       : null;
 
-  const estimate = profile ? calculateCalorieTarget(profile) : null;
+  const estimateResult = useEstimate(profile);
+  const estimate = estimateResult?.targets;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -270,7 +291,7 @@ export function ProfileForm() {
         {estimate && profile ? (
           <>
             <p className="mt-4 text-4xl font-semibold text-neutral-900">
-              {numberFormat.format(estimate.target)}
+              {numberFormat.format(estimate.calories)}
               <span className="ml-1 text-base font-medium text-neutral-400">kcal</span>
             </p>
             <p className="mt-1 text-sm text-neutral-500">
@@ -289,7 +310,7 @@ export function ProfileForm() {
               <div className="flex justify-between gap-4">
                 <dt className="text-neutral-500">Água</dt>
                 <dd className="font-medium text-neutral-900">
-                  {numberFormat.format(calculateWaterLiters(profile.weightKg))} L
+                  {numberFormat.format(estimate.waterLiters)} L
                 </dd>
               </div>
             </dl>
@@ -302,12 +323,16 @@ export function ProfileForm() {
           </>
         ) : (
           <p className="mt-4 text-sm text-neutral-500">
-            Preencha seus dados para calcular quantas calorias seu plano alimentar deve ter.
+            {!profile
+              ? "Preencha seus dados para calcular quantas calorias seu plano alimentar deve ter."
+              : estimateResult?.error
+                ? `Não foi possível calcular a meta: ${estimateResult.error}`
+                : "Calculando…"}
           </p>
         )}
 
         <p className="mt-4 text-xs text-neutral-400">
-          Estimativa pela equação de Mifflin-St Jeor. Não substitui a orientação de um profissional.
+          Estimativa calculada a partir dos seus dados. Não substitui a orientação de um profissional.
         </p>
 
         <button

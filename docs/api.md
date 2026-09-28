@@ -1,33 +1,39 @@
 # API do NutriAI
 
-Endpoints que o front chama. Os tipos TypeScript de cada corpo e resposta estão em
-[`src/lib/api/types.ts`](../src/lib/api/types.ts) — se algo aqui divergir, os tipos valem.
+Endpoints que o front chama e as regras de negócio que o backend implementa. O front **só exibe**:
+metas, plano do dia, porções, trocas, sugestões e estatísticas vêm prontos do backend.
 
-Os dados simulados que o front usava antes estão no histórico do git (`git show 158453f:src/lib/mock-data.ts`)
-e servem de semente para o banco.
+Os tipos TypeScript de cada corpo e resposta estão em [`src/lib/api/types.ts`](../src/lib/api/types.ts) —
+se algo aqui divergir, os tipos valem.
+
+## Referências no histórico do git
+
+Antes, essas regras rodavam no navegador. O código antigo é a referência exata do comportamento:
+
+| O quê | Onde |
+| --- | --- |
+| Dados de exemplo (plano, catálogo, sugestões, nutrientes, histórico, chat) | `git show 158453f:src/lib/mock-data.ts` |
+| Meta calórica e água | `git show 158453f:src/lib/calorie-target.ts` |
+| Plano do dia, criar/remover refeição, acrescentar alimento, porções | `git show 158453f:src/components/dashboard/MealPlan.tsx` |
+| Trocas de alimentos e substitutos | `git show 158453f:src/lib/food-substitution.ts` |
+| Busca de alimentos | `git show 158453f:src/components/dashboard/AddFoodDialog.tsx` |
+| O que era guardado por usuário | `git show 158453f:src/lib/auth.ts` |
+| Estatísticas do histórico | `git show 158453f:src/components/history/HistoryDashboard.tsx`, `NutrientChart.tsx`, `ActivityPanel.tsx` |
 
 ## Convenções
 
 - **URL base:** `NEXT_PUBLIC_API_URL` (ver `.env.example`). Todas as rotas abaixo são relativas a ela.
-- **Formato:** JSON (`Content-Type: application/json`), nomes de campo em camelCase.
+- **Formato:** JSON, nomes de campo em camelCase.
 - **Autenticação:** as rotas marcadas com 🔒 exigem `Authorization: Bearer <token>`. Token inválido ou
   expirado → `401`; o front descarta o token e volta para `/login`.
-- **Erros:** status 4xx/5xx com corpo `{ "error": "mensagem em pt-BR" }`. A mensagem é mostrada ao
-  usuário como está (ex.: `"Usuário ou senha incorretos."`).
-- **Datas:** dia do calendário como `"AAAA-MM-DD"`; data e hora em ISO 8601 (`"2026-09-28T07:15:00.000Z"`).
-  Horário de refeição como `"HH:MM"`.
+- **Fuso do usuário:** toda requisição leva `X-Timezone` (IANA, ex.: `America/Sao_Paulo`). Use-o para
+  saber qual é o "hoje" do usuário (plano do dia, mudanças que valem só hoje, lembrete de pesagem).
+- **Erros:** status 4xx/5xx com corpo `{ "error": "mensagem em pt-BR" }`, mostrada ao usuário como está.
+- **Datas:** dia como `"AAAA-MM-DD"`; data e hora em ISO 8601. Horário de refeição como `"HH:MM"`.
 - **Quantidades de alimentos sempre em gramas** (`grams`), nunca medidas caseiras.
-- **CORS:** o front roda em outra origem (Cloudflare Workers / Docker na porta 3000). Libere a origem
-  dele, os métodos `GET, POST, PUT, DELETE` e os cabeçalhos `Authorization, Content-Type`.
-
-## Divisão de responsabilidades
-
-O back **fornece e guarda** os dados; os cálculos do plano do dia continuam no front:
-
-- O front monta o plano de hoje a partir do plano base (`GET /meal-plan`) + as mudanças do usuário
-  (`planChanges`, `dayPlan`, trocas de alimentos), calcula porções, totais e a redistribuição de calorias.
-- O back guarda essas mudanças como o front as envia (rotas `/me/...`) e devolve o estado completo.
-- Meta calórica e de água também são calculadas no front a partir do perfil (`src/lib/calorie-target.ts`).
+- **Números prontos para exibir:** gramas e kcal inteiros; o front não arredonda nem soma.
+- **CORS:** libere a origem do front, os métodos `GET, POST, PUT, DELETE` e os cabeçalhos
+  `Authorization, Content-Type, X-Timezone`.
 
 ## Autenticação
 
@@ -37,11 +43,9 @@ O back **fornece e guarda** os dados; os cálculos do plano do dia continuam no 
 { "name": "Ana Souza", "username": "ana.souza", "password": "segredo123" }
 ```
 
-- `username`: já chega normalizado (minúsculas, sem espaços), 3–20 caracteres `[a-z0-9._]`.
-- `password`: mínimo 6 caracteres.
-- Usuário já existe → `409` `{ "error": "Esse usuário já está em uso." }`.
-
-Resposta `201`: `{ "token": "..." }`. O usuário nasce com `profile: null` (o front leva para `/perfil`).
+`username` chega normalizado (minúsculas), 3–20 caracteres `[a-z0-9._]`; `password` com 6+ caracteres
+(valide também no back). Usuário já existe → `409` `{ "error": "Esse usuário já está em uso." }`.
+Resposta `201`: `{ "token": "..." }`. O usuário nasce sem perfil.
 
 ### `POST /auth/login`
 
@@ -50,15 +54,11 @@ Resposta `201`: `{ "token": "..." }`. O usuário nasce com `profile: null` (o fr
 ```
 
 Resposta `200`: `{ "token": "..." }`. Credenciais erradas → `401` `{ "error": "Usuário ou senha incorretos." }`.
+Logout é só no front (descarta o token).
 
-Logout é só no front (descarta o token); não há rota.
+## Usuário e perfil 🔒
 
-## Estado do usuário 🔒
-
-### `GET /me` → `UserState`
-
-Chamado ao abrir o app. **Todas as rotas que alteram `/me` respondem `200` com este mesmo objeto
-completo e atualizado**, que o front usa para substituir o que tinha.
+### `GET /me` → `Me`
 
 ```json
 {
@@ -73,124 +73,217 @@ completo e atualizado**, que o front usa para substituir o que tinha.
     "mealsPerDay": 4,
     "weighInDay": 1
   },
-  "mealTimes": { "1": "08:00" },
-  "weights": [{ "id": "w-1", "at": "2026-09-28T07:15:00.000Z", "kg": 68.2 }],
-  "planChanges": { "removed": [], "added": [], "extraFoods": {}, "scales": {} },
-  "dayPlan": null,
-  "foodFeedback": { "Guacamole": "nao-gosto" },
-  "foodSubstitutes": { "Guacamole": "Abacate" },
-  "mealFoodSwaps": { "2": { "Limão": "" } }
+  "targets": { "calories": 1660, "bmr": 1395, "tdee": 2163, "waterLiters": 2.4, "clampedToMinimum": false },
+  "weighInDue": true
 }
 ```
 
-| Campo | Descrição |
-| --- | --- |
-| `profile` | `null` até o primeiro `PUT /me/profile`. `sex`: `feminino \| masculino`. `activityLevel`: `sedentario \| leve \| moderado \| intenso \| extremo`. `goal`: `perder \| manter \| ganhar`. `mealsPerDay`: 3–6. `weighInDay`: dia da semana do lembrete de pesagem, 0 = domingo … 6 = sábado. |
-| `mealTimes` | Horário escolhido pelo usuário para refeições do plano base (id → `"HH:MM"`). |
-| `weights` | Pesagens (qualquer ordem; o front ordena). Não alteram `profile.weightKg`. |
-| `planChanges` | Mudanças permanentes do plano (ver `PlanChanges` em `types.ts`): refeições removidas, criadas (`added`, ids ≥ 1001), alimentos acrescentados (`extraFoods`) e fatores de porção (`scales`). Chaves numéricas de objetos viram string no JSON. |
-| `dayPlan` | Mudanças que valem só num dia: `{ "date": "2026-09-28", "changes": { "removed": [], "replacements": {}, "scales": {} } }`. O front ignora se `date` não for hoje; o back pode descartar as antigas. |
-| `foodFeedback` | Alimentos restritos: nome → `nao-gosto \| nao-quero \| nao-tenho`. |
-| `foodSubstitutes` | Trocas em todas as refeições: nome → substituto (`""` = removido sem substituto). |
-| `mealFoodSwaps` | Trocas numa refeição só: id da refeição → nome → substituto (`""` = removido). |
+- `profile` e `targets` são `null` até o primeiro `PUT /me/profile` (o front leva o usuário para `/perfil`).
+- `profile.sex`: `feminino | masculino`; `activityLevel`: `sedentario | leve | moderado | intenso | extremo`;
+  `goal`: `perder | manter | ganhar`; `mealsPerDay`: 3–6; `weighInDay`: 0 = domingo … 6 = sábado.
+- `weighInDue`: hoje (no fuso do usuário) é `profile.weighInDay` **e** não há pesagem registrada hoje.
 
-### `PUT /me/profile` → `UserState`
+### `PUT /me/profile` → `Me`
 
-Corpo: o objeto `profile` inteiro (todos os campos obrigatórios).
+Corpo: o `profile` inteiro. Recalcula `targets`.
 
-### `PUT /me/meal-times/{mealId}` → `UserState`
+### `POST /profile/estimate` → `Targets`
 
-Corpo: `{ "time": "08:00" }`. Grava `mealTimes[mealId]`.
+Corpo: um `profile` completo, **sem salvar**. O formulário de perfil chama enquanto o usuário edita, para
+mostrar a meta antes de salvar.
 
-### `POST /me/weights` → `UserState`
+**Regras das metas**
 
-Corpo: `{ "kg": 68.2, "at": "2026-09-28T07:15:00.000Z" }`. O back gera o `id`. `at` pode ser até 89 dias no passado.
+- TMB (Mifflin-St Jeor): `10 × peso + 6,25 × altura − 5 × idade`, `+5` para masculino, `−161` para feminino.
+- Gasto diário (`tdee`) = TMB × fator: sedentário 1,2; leve 1,375; moderado 1,55; intenso 1,725; extremo 1,9.
+- Meta = gasto + ajuste do objetivo (perder −500, manter 0, ganhar +300), arredondada para dezenas, com
+  piso de 1200 kcal (feminino) / 1500 kcal (masculino). `clampedToMinimum` = ficou abaixo do piso.
+- Água = 35 ml por kg, em litros com uma casa decimal.
+- `bmr` e `tdee` arredondados para inteiro.
 
-### `PUT /me/plan-changes` → `UserState`
+## Pesos 🔒
 
-Corpo: o `PlanChanges` inteiro, que substitui o anterior.
+### `GET /weights` → `WeightEntry[]`
 
-### `PUT /me/day-plan` → `UserState`
+Do mais antigo para o mais recente: `[{ "id": "w-1", "at": "2026-09-28T07:15:00.000Z", "kg": 68.2 }]`.
+Pesagens são só histórico: não alteram `profile.weightKg` nem as metas.
 
-Corpo: `{ "date": "2026-09-28", "changes": { ... } }` (data local do usuário). Substitui o `dayPlan`.
+### `POST /weights` → `WeightEntry[]`
 
-### `POST /me/food-swaps` → `UserState`
-
-Troca um alimento ("Substituir alimento" no plano).
-
-```json
-{ "foodName": "Guacamole", "reason": "nao-gosto", "substitute": "Abacate", "mealId": null }
-```
-
-- `substitute`: nome do substituto, ou `null` para remover sem substituto (grave como `""`).
-- `reason` = `nao-gosto` ou `nao-tenho` (`mealId` = `null`): `foodSubstitutes[foodName] = substitute ?? ""` e
-  `foodFeedback[foodName] = reason`.
-- `reason` = `nao-quero` (`mealId` = id da refeição): `mealFoodSwaps[mealId][foodName] = substitute ?? ""` e,
-  **só se ainda não houver marcação**, `foodFeedback[foodName] = "nao-quero"`.
-
-### `DELETE /me/food-feedback/{foodName}` → `UserState`
-
-"Liberar" na página Alimentos: remove `foodFeedback[foodName]`. **Não** mexe em `foodSubstitutes` nem
-`mealFoodSwaps` (as trocas feitas continuam). `foodName` vem com `encodeURIComponent`.
+Corpo: `{ "kg": 68.2, "at": "2026-09-28T07:15:00.000Z" }` (até 89 dias no passado, não no futuro). Responde a
+lista completa atualizada. Depois o front busca `/me` de novo (para `weighInDue`).
 
 ## Plano alimentar 🔒
 
-### `GET /meal-plan` → `Meal[]`
+### `GET /plan/today` → `TodayPlan`
 
-Plano base do usuário (antes das mudanças dele).
-
-```json
-[
-  {
-    "id": 1,
-    "title": "Torrada de Abacate com Ovo Poché",
-    "time": "07:30",
-    "foods": [
-      { "name": "Pão integral", "grams": 50, "carbs": 24, "protein": 6, "fat": 2, "kcal": 140 }
-    ]
-  }
-]
-```
-
-Ids do plano base devem ficar abaixo de 1001 (acima disso são refeições criadas pelo usuário).
-
-### `GET /meal-alternatives` → `MealAlternative[]`
-
-Refeições que o assistente pode sugerir ao remover uma refeição ("sugerir uma nova") e ao criar uma.
+O plano de hoje com **todas** as mudanças do usuário aplicadas, ordenado por horário:
 
 ```json
-[
-  {
-    "title": "Iogurte Grego com Granola e Morangos",
-    "periods": ["manha", "tarde"],
-    "foods": [{ "name": "Iogurte grego natural", "grams": 170, "carbs": 7, "protein": 15, "fat": 7, "kcal": 150 }]
-  }
-]
+{
+  "canCreateMeal": true,
+  "meals": [
+    {
+      "id": 1,
+      "title": "Torrada de Abacate com Ovo Poché",
+      "time": "07:30",
+      "totals": { "carbs": 29, "protein": 13, "fat": 22, "kcal": 350 },
+      "foods": [
+        { "name": "Pão integral", "grams": 50, "carbs": 24, "protein": 6, "fat": 2, "kcal": 140, "extraId": null },
+        { "name": "Banana-prata", "grams": 60, "carbs": 16, "protein": 1, "fat": 0, "kcal": 60, "extraId": "x-7" }
+      ]
+    }
+  ]
+}
 ```
 
-`periods`: `manha` (antes das 11:00), `tarde` (até 16:59), `noite`.
+- `totals` = soma dos alimentos já arredondados, como aparecem.
+- `extraId` ≠ `null`: alimento acrescentado pelo usuário (tem botão de remover).
+- `canCreateMeal`: há sugestões de refeição disponíveis (senão o botão "Nova refeição" fica desativado).
 
-### `GET /foods` → `CatalogFood[]`
+**Todas as rotas de alteração do plano abaixo respondem `200` com o `TodayPlan` atualizado.**
 
-Catálogo com nutrientes por 100 g. **Todo alimento que aparece em `/meal-plan` ou `/meal-alternatives`
-precisa estar aqui**, senão não pode ser trocado. Os substitutos oferecidos são do mesmo `group`.
+**Como o plano de hoje é montado** (o que o usuário muda fica guardado em duas camadas):
+
+- **Permanente** (até o usuário desfazer): refeições removidas com "não fazer nada", refeições criadas
+  (ids ≥ 1001), alimentos acrescentados por refeição, horários escolhidos, trocas de alimentos e um fator de
+  porção por refeição.
+- **Só de hoje** (descartado quando o dia vira): refeições removidas com "redistribuir", refeições trocadas
+  por uma sugestão e um fator de porção por refeição.
+- Para cada refeição: aplica as trocas de alimentos (ver "Trocas"), junta os alimentos acrescentados e
+  multiplica as porções por `fator permanente × fator de hoje` (gramas e nutrientes, arredondando; gramas no
+  mínimo 1).
+- Sempre que um fator sobe para compensar calorias, confira os valores **já arredondados**: se o total do dia
+  passar do total anterior, reduza o fator aos poucos (×0,999) até caber. O dia nunca ganha calorias com uma
+  ação do usuário.
+
+### `PUT /plan/meals/{id}/time`
+
+Corpo: `{ "time": "08:00" }`. Permanente.
+
+### Remover refeição
+
+`GET /plan/meals/{id}/removal-options` → `RemovalOptions`
 
 ```json
-[{ "name": "Pão integral", "group": "carboidratos", "per100g": { "carbs": 48, "protein": 12, "fat": 4, "kcal": 280 } }]
+{
+  "suggestion": { "title": "Iogurte Grego com Granola e Morangos", "kcal": 330 },
+  "redistribution": [{ "mealId": 3, "title": "Bowl de Salmão", "time": "20:00", "before": 435, "after": 520 }]
+}
 ```
 
-`group`: `carboidratos | proteinas | laticinios | gorduras | frutas | vegetais | adocantes | acidos`.
+`POST /plan/meals/{id}/removal` com `{ "option": "suggest" | "redistribute" | "nothing" }`:
+
+- `suggest` (só hoje): troca pela sugestão de calorias mais próximas da porção original (fator 1) da
+  refeição, entre as que ainda não estão no plano, preferindo as sem alimentos restritos. Mesmo id e horário.
+  `suggestion` é `null` se não houver nenhuma.
+- `redistribute` (só hoje): a refeição sai e as refeições **seguintes** (horário maior) aumentam as porções
+  pelo mesmo fator, para receber as calorias dela, sem passar do total que o dia tinha. `redistribution`
+  lista o antes/depois delas (vazio se não houver refeição depois — então a opção não vale).
+- `nothing` (permanente): a refeição sai do plano; as calorias não são repostas. Se for uma refeição criada,
+  apaga ela e os alimentos acrescentados a ela.
+
+### Criar refeição
+
+`POST /plan/meal-preview` com `{ "title": "Lanche pré-treino", "time": "16:00" }` → `CreateMealPreview`
+(nada é salvo):
+
+```json
+{
+  "totals": { "carbs": 30, "protein": 18, "fat": 8, "kcal": 280 },
+  "reductionPercent": 17,
+  "changes": [{ "mealId": 1, "title": "Torrada de Abacate", "time": "07:30", "before": 350, "after": 290 }],
+  "dayKcal": 1160
+}
+```
+
+`POST /plan/meals` com o mesmo corpo cria de fato (permanente).
+
+- Os alimentos vêm de uma sugestão do período do horário (manhã < 11:00, tarde < 17:00, noite), preferindo
+  uma que ainda não está no plano e sem alimentos restritos.
+- A porção da sugestão é reduzida para no máximo `calorias do dia ÷ (nº de refeições + 1)`.
+- Todas as outras refeições reduzem as porções pelo mesmo fator para o total do dia não mudar
+  (`reductionPercent` = quanto reduziram; `changes` = antes/depois de cada uma; `dayKcal` = total do dia).
+- Com o plano vazio, a sugestão entra com a porção original.
+
+### Acrescentar alimento
+
+`GET /plan/meals/{id}/food-search?q=banana` → `FoodSearchResult`
+
+```json
+{
+  "found": true,
+  "restricted": null,
+  "options": [
+    {
+      "food": { "name": "Banana-prata", "grams": 60, "carbs": 16, "protein": 1, "fat": 0, "kcal": 60 },
+      "reductionPercent": 4
+    }
+  ]
+}
+```
+
+- Procura no catálogo, sem diferenciar maiúsculas nem acentos, os alimentos cujo nome **contém** o texto
+  (`found: true`). Se nenhum, devolve os 5 mais parecidos (`found: false`); o front antigo usava
+  semelhança por pares de letras (coeficiente de Dice sobre bigramas).
+- Alimentos restritos pelo usuário nunca aparecem. Se o texto é exatamente um alimento restrito,
+  `restricted` traz o nome e a marcação dele.
+- Porção de cada opção: as calorias médias por alimento da refeição (`kcal da refeição ÷ (nº de alimentos + 1)`,
+  ou 100 kcal se der 0), convertidas em gramas pelo catálogo.
+- `reductionPercent`: quanto as porções de **todas** as refeições diminuem para o dia não ganhar calorias.
+
+`POST /plan/meals/{id}/foods` com `{ "foodName": "Banana-prata" }` acrescenta (permanente), com a porção e a
+redução da busca. Guarde o alimento na porção "fator 1" da refeição, para ele acompanhar as mudanças de
+porção dela.
+
+`DELETE /plan/meals/{id}/foods/{extraId}` remove um alimento acrescentado; as calorias dele voltam para
+todas as refeições (porções aumentam pelo mesmo fator, sem passar do total que o dia tinha).
+
+### Trocar alimento ("Substituir alimento")
+
+`GET /plan/meals/{id}/substitutes?food=Guacamole` → `PlanFood[]`: alimentos do **mesmo grupo** do catálogo,
+sem o próprio e sem os restritos pelo usuário, cada um numa porção com as **mesmas calorias** do alimento
+como aparece na refeição.
+
+`POST /plan/meals/{id}/swaps` com:
+
+```json
+{ "foodName": "Guacamole", "reason": "nao-gosto", "substitute": "Abacate" }
+```
+
+- `substitute: null` = o alimento sai sem substituto.
+- `nao-gosto` / `nao-tenho`: troca **permanente em todas as refeições**, e o alimento fica restrito com essa
+  marcação.
+- `nao-quero`: troca **permanente só nesta refeição** (as outras continuam com ele), e o alimento fica
+  restrito com `nao-quero` **só se ainda não tiver marcação**.
+- Ao montar o plano, as trocas da refeição valem por cima das gerais, e seguem a cadeia (A → B e depois
+  B → C = C), no máximo 5 passos. O substituto entra com as mesmas calorias do trocado.
+
+### `/foods/restricted` — página Alimentos
+
+`GET /foods/restricted` → `RestrictedFood[]`
+
+```json
+[{ "name": "Guacamole", "feedback": "nao-gosto", "group": "gorduras", "onlyInMeal": false, "substitute": "Abacate" }]
+```
+
+`onlyInMeal: true` para `nao-quero`. `substitute: null` = removido sem substituto. `group`:
+`carboidratos | proteinas | laticinios | gorduras | frutas | vegetais | adocantes | acidos` (ou `null`).
+
+`DELETE /foods/restricted/{name}` ("Liberar") → `RestrictedFood[]` atualizada. Só tira a restrição (o
+alimento volta a poder ser sugerido e oferecido); **as trocas já feitas continuam**.
+
+**Alimentos restritos:** nunca aparecem como substitutos nem na busca, e as sugestões de refeição (criar,
+"sugerir uma nova") preferem as que não os usam.
 
 ## Nutrientes 🔒
 
 ### `GET /nutrition/today` → `NutritionToday`
 
-Consumo de hoje e metas. Cada nutriente: `{ id, name, atual, meta, unit, limit? }`. `limit: true` quando
-`meta` é um máximo (açúcares, gordura saturada, colesterol, sódio). O `id` é a chave usada em
-`/history/nutrients`.
-
 ```json
 {
+  "consumedKcal": 1985,
+  "burnedKcal": 2210,
   "macros": [
     { "id": "proteinas", "name": "Proteínas", "atual": 145, "meta": 150, "unit": "g" },
     { "id": "gorduras", "name": "Gorduras", "atual": 65, "meta": 70, "unit": "g" },
@@ -203,48 +296,93 @@ Consumo de hoje e metas. Cada nutriente: `{ id, name, atual, meta, unit, limit? 
 }
 ```
 
-`macros` precisa ter exatamente os ids `proteinas`, `gorduras` e `carboidratos`, em gramas: o front calcula
-as calorias consumidas com eles (4/9/4 kcal por grama).
+- `consumedKcal`: calorias consumidas hoje (o front antigo usava macros × 4/9/4 kcal por grama).
+- `burnedKcal`: gasto de hoje do Google Fit / Apple Saúde; `null` sem dados.
+- `limit: true` quando `meta` é um máximo (açúcares, gordura saturada, colesterol, sódio).
+- `macros` precisa ter os ids `proteinas`, `gorduras` e `carboidratos` (o front usa para as cores).
 
-## Histórico 🔒
+### `GET /nutrients/groups` → `NutrientGroup[]`
 
-### `GET /history/activity?days=N` → `ActivityDay[]`
-
-Os últimos `N` dias (o front pede 1 e 90), do mais antigo para o mais recente. O último item é hoje (o card
-"Meta diária" mostra o `burned` dele).
+Seletor do gráfico de nutrientes do histórico:
 
 ```json
 [
-  {
-    "date": "2026-09-28",
-    "consumed": 1985,
-    "burned": 2210,
-    "activeCalories": 560,
-    "steps": 9800,
-    "activeMinutes": 72,
-    "distanceKm": 7.4,
-    "source": "Google Fit"
-  }
+  { "name": "Macronutrientes", "nutrients": [{ "id": "proteinas", "name": "Proteínas", "unit": "g" }] },
+  { "name": "Vitaminas", "nutrients": [{ "id": "vitamina-c", "name": "Vitamina C", "unit": "mg" }] },
+  { "name": "Minerais", "nutrients": [{ "id": "sodio", "name": "Sódio", "unit": "mg", "limit": true }] }
 ]
 ```
 
-### `GET /history/nutrients?days=N` → `NutrientHistoryDay[]`
+## Histórico 🔒
 
-Consumo diário por nutriente, mesmas datas e ordem de `/history/activity`. Chaves de `values` = `id` dos
-nutrientes de `/nutrition/today` (nutriente ausente num dia conta como 0).
+O front pede `days` = 7, 30 ou 90. Dias do mais antigo para o mais recente, o último é hoje.
+
+### `GET /history/summary?days=N` → `HistorySummary`
 
 ```json
-[{ "date": "2026-09-28", "values": { "proteinas": 145, "fibras": 22, "vitamina-c": 95 } }]
+{
+  "avgConsumed": 2010,
+  "avgBurned": 2180,
+  "avgBalance": -170,
+  "daysOnGoal": 18,
+  "totalDays": 30,
+  "calorieGoal": 1660,
+  "goalTolerance": 150
+}
 ```
+
+Médias arredondadas; `avgBalance` = consumida − gasta. Um dia está "dentro da meta" quando o consumo fica a
+até `goalTolerance` (150) kcal da meta calórica.
+
+### `GET /history/activity?days=N` → `ActivityHistory`
+
+```json
+{
+  "days": [
+    {
+      "date": "2026-09-28",
+      "consumed": 1985,
+      "burned": 2210,
+      "activeCalories": 560,
+      "steps": 9800,
+      "activeMinutes": 72,
+      "distanceKm": 7.4,
+      "source": "Google Fit"
+    }
+  ],
+  "averages": { "steps": 8350, "activeCalories": 480, "activeMinutes": 61 },
+  "totalDistanceKm": 187
+}
+```
+
+Médias por dia e distância total arredondadas para inteiro.
+
+### `GET /history/nutrients/{id}?days=N` → `NutrientHistory`
+
+```json
+{
+  "nutrient": { "id": "sodio", "name": "Sódio", "unit": "mg", "meta": 2000, "limit": true },
+  "days": [{ "date": "2026-09-28", "value": 1800 }],
+  "average": 1840,
+  "averagePercent": 92,
+  "daysOnGoal": 9,
+  "daysOverLimit": 4
+}
+```
+
+Dia sem registro vale 0. `averagePercent` = média em % da meta. `daysOnGoal` = dias com valor ≥ meta;
+`daysOverLimit` = dias com valor > meta (o front mostra um ou outro conforme `limit`).
 
 ### `GET /history/plans` → `PlanHistoryDay[]`
 
-Planos dos dias anteriores, do mais recente para o mais antigo.
+Dias anteriores, do mais recente para o mais antigo:
 
 ```json
 [
   {
     "date": "2026-09-27",
+    "followedCount": 3,
+    "plannedKcal": 1440,
     "meals": [{ "time": "07:30", "title": "Panqueca de Aveia com Banana", "kcal": 380, "followed": true }],
     "flaggedFoods": [{ "name": "Guacamole", "feedback": "nao-quero" }]
   }
@@ -262,15 +400,8 @@ Planos dos dias anteriores, do mais recente para o mais antigo.
 
 ## Chat 🔒
 
-### `GET /chat/messages` → `ChatMessage[]`
-
-Conversa do usuário, da mais antiga para a mais recente: `{ "id": "m-1", "role": "assistant" | "user", "text": "..." }`.
-
-### `POST /chat/messages` → `ChatMessage`
-
-Corpo: `{ "text": "Quantas calorias eu já consumi hoje?" }`. Guarda a mensagem do usuário e responde
-com a **resposta do assistente** (`role: "assistant"`).
-
-### `GET /chat/suggestions` → `string[]`
-
-Perguntas sugeridas no painel lateral do chat.
+- `GET /chat/messages` → `ChatMessage[]`: conversa do usuário, da mais antiga para a mais recente
+  (`{ "id": "m-1", "role": "assistant" | "user", "text": "..." }`).
+- `POST /chat/messages` com `{ "text": "..." }` → `ChatMessage`: guarda a mensagem do usuário e responde com a
+  **resposta do assistente**.
+- `GET /chat/suggestions` → `string[]`: perguntas sugeridas no painel lateral.

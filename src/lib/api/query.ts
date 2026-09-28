@@ -9,9 +9,17 @@ const EMPTY: Entry = { loading: false };
 const cache = new Map<string, Entry>();
 const listeners = new Set<() => void>();
 
+function notify() {
+  listeners.forEach((listener) => listener());
+}
+
 function set(path: string, entry: Entry) {
   cache.set(path, entry);
-  listeners.forEach((listener) => listener());
+  notify();
+}
+
+function toApiError(error: unknown) {
+  return error instanceof ApiError ? error : new ApiError("Erro inesperado.", 0);
 }
 
 function load(path: string) {
@@ -20,12 +28,7 @@ function load(path: string) {
   set(path, { ...entry, loading: true, error: undefined });
   apiFetch(path).then(
     (data) => set(path, { data, loading: false }),
-    (error: unknown) =>
-      set(path, {
-        ...cache.get(path),
-        loading: false,
-        error: error instanceof ApiError ? error : new ApiError("Erro inesperado.", 0),
-      })
+    (error: unknown) => set(path, { ...cache.get(path), loading: false, error: toApiError(error) })
   );
 }
 
@@ -38,7 +41,7 @@ function subscribe(listener: () => void) {
 
 onTokenChange(() => {
   cache.clear();
-  listeners.forEach((listener) => listener());
+  notify();
 });
 
 export type Query<T> = {
@@ -71,4 +74,55 @@ export function useApiQuery<T>(path: string | null): Query<T> {
       if (path) load(path);
     },
   };
+}
+
+/** Busca de novo as rotas que começam com algum dos prefixos (as que estão na tela recarregam). */
+export function invalidate(...prefixes: string[]) {
+  for (const path of cache.keys()) {
+    if (prefixes.some((prefix) => path.startsWith(prefix))) load(path);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Alterações
+
+/** Falha na última alteração; `AuthGuard` mostra como aviso até ser dispensada. */
+let mutationError: string | null = null;
+
+/**
+ * Envia uma alteração. A resposta substitui o cache de `update` (a rota que ela representa) e as
+ * rotas com os prefixos de `invalidate` são buscadas de novo. Em caso de erro mostra o aviso e
+ * devolve `null`.
+ */
+export async function mutate<T>(
+  path: string,
+  method: string,
+  body?: unknown,
+  options: { update?: string; invalidate?: string[] } = {}
+): Promise<T | null> {
+  try {
+    const data = await apiFetch<T>(path, { method, body });
+    mutationError = null;
+    if (options.update) cache.set(options.update, { data, loading: false });
+    notify();
+    if (options.invalidate) invalidate(...options.invalidate);
+    return data;
+  } catch (error) {
+    mutationError = toApiError(error).message;
+    notify();
+    return null;
+  }
+}
+
+export function useMutationError() {
+  return useSyncExternalStore(
+    subscribe,
+    () => mutationError,
+    () => null
+  );
+}
+
+export function dismissMutationError() {
+  mutationError = null;
+  notify();
 }

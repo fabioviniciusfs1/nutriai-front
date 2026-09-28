@@ -2,27 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { pad, TimeFields, toTimeValue } from "@/components/dashboard/TimePickerDialog";
+import { ApiError, apiFetch } from "@/lib/api/client";
+import type { CreateMealPreview } from "@/lib/api/types";
 
 const MAX_NAME_LENGTH = 40;
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
 
-/** O que acontece no dia se a refeição for criada — mostrado no aviso antes de confirmar. */
-export type CreateMealPreview = {
-  totals: { carbs: number; protein: number; fat: number; kcal: number };
-  /** Quanto as porções das outras refeições diminuem (%). */
-  reductionPercent: number;
-  sources: { title: string; time: string; before: number; after: number }[];
-};
-
 type CreateMealDialogProps = {
   open: boolean;
-  preview: (name: string, time: string) => CreateMealPreview;
-  onConfirm: (name: string, time: string) => void;
+  onConfirm: (name: string, time: string) => Promise<void>;
   onCancel: () => void;
 };
 
-export function CreateMealDialog({ open, preview, onConfirm, onCancel }: CreateMealDialogProps) {
+export function CreateMealDialog({ open, onConfirm, onCancel }: CreateMealDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState("");
   const [hours, setHours] = useState("00");
@@ -30,6 +23,7 @@ export function CreateMealDialog({ open, preview, onConfirm, onCancel }: CreateM
   const [error, setError] = useState<string | null>(null);
   // Segunda etapa: o aviso de onde saem os nutrientes da nova refeição.
   const [confirming, setConfirming] = useState<CreateMealPreview | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -42,13 +36,29 @@ export function CreateMealDialog({ open, preview, onConfirm, onCancel }: CreateM
       setMinutes(pad(now.getMinutes()));
       setError(null);
       setConfirming(null);
+      setBusy(false);
       dialog.showModal();
     }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
   const time = toTimeValue(hours, minutes);
-  const dayKcal = confirming?.sources.reduce((sum, source) => sum + source.before, 0) ?? 0;
+
+  /** O backend diz o que o assistente vai sugerir e de onde saem as calorias. */
+  async function loadPreview() {
+    setBusy(true);
+    try {
+      const preview = await apiFetch<CreateMealPreview>("/plan/meal-preview", {
+        method: "POST",
+        body: { title: name.trim(), time },
+      });
+      setConfirming(preview);
+    } catch (previewError) {
+      setError(previewError instanceof ApiError ? previewError.message : "Erro inesperado.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <dialog
@@ -71,25 +81,25 @@ export function CreateMealDialog({ open, preview, onConfirm, onCancel }: CreateM
             {confirming.totals.fat}g gord.).
           </p>
 
-          {confirming.sources.length > 0 ? (
+          {confirming.changes.length > 0 ? (
             <>
               <p className="mt-3 text-sm text-neutral-600">
                 Para não passar da meta diária, esses nutrientes saem das outras refeições, que terão as porções
                 reduzidas em <strong>{confirming.reductionPercent}%</strong>:
               </p>
               <ul className="mt-3 flex flex-col divide-y divide-neutral-100 rounded-xl border border-neutral-100">
-                {confirming.sources.map((source) => (
-                  <li key={`${source.time}-${source.title}`} className="flex items-center gap-3 px-3 py-2 text-sm">
-                    <span className="w-11 shrink-0 text-xs text-neutral-400">{source.time}</span>
-                    <span className="min-w-0 flex-1 truncate text-neutral-800">{source.title}</span>
+                {confirming.changes.map((change) => (
+                  <li key={change.mealId} className="flex items-center gap-3 px-3 py-2 text-sm">
+                    <span className="w-11 shrink-0 text-xs text-neutral-400">{change.time}</span>
+                    <span className="min-w-0 flex-1 truncate text-neutral-800">{change.title}</span>
                     <span className="shrink-0 text-right tabular-nums text-neutral-500">
-                      {source.before} → <span className="font-medium text-neutral-900">{source.after}</span> kcal
+                      {change.before} → <span className="font-medium text-neutral-900">{change.after}</span> kcal
                     </span>
                   </li>
                 ))}
               </ul>
               <p className="mt-2 text-xs text-neutral-500">
-                O total do dia continua em cerca de {numberFormat.format(dayKcal)} kcal. A refeição fica no plano até
+                O total do dia continua em cerca de {numberFormat.format(confirming.dayKcal)} kcal. A refeição fica no plano até
                 você removê-la.
               </p>
             </>
@@ -115,8 +125,13 @@ export function CreateMealDialog({ open, preview, onConfirm, onCancel }: CreateM
             <button
               type="button"
               autoFocus
-              onClick={() => onConfirm(name.trim(), time)}
-              className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                await onConfirm(name.trim(), time);
+                setBusy(false);
+              }}
+              className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
             >
               Confirmar
             </button>
@@ -131,7 +146,7 @@ export function CreateMealDialog({ open, preview, onConfirm, onCancel }: CreateM
               setError("Dê um nome para a refeição.");
               return;
             }
-            setConfirming(preview(name.trim(), time));
+            void loadPreview();
           }}
         >
           <h4 className="font-semibold text-neutral-900">Nova refeição</h4>
@@ -177,9 +192,10 @@ export function CreateMealDialog({ open, preview, onConfirm, onCancel }: CreateM
             </button>
             <button
               type="submit"
-              className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+              disabled={busy}
+              className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
             >
-              Continuar
+              {busy ? "Calculando…" : "Continuar"}
             </button>
           </div>
         </form>
