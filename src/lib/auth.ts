@@ -1,7 +1,7 @@
 // Sessão: o token fica no localStorage e os dados do usuário vêm de `GET /me`.
 import { ApiError, apiFetch, apiUrl, setToken, useToken } from "@/lib/api/client";
-import { mutate, useApiQuery } from "@/lib/api/query";
-import type { AuthResponse, Me, Targets } from "@/lib/api/types";
+import { invalidate, mutate, useApiQuery } from "@/lib/api/query";
+import type { AuthResponse, GoogleLinkResponse, Me, Targets } from "@/lib/api/types";
 import type { Profile } from "@/lib/profile";
 
 export type AuthState = {
@@ -9,11 +9,12 @@ export type AuthState = {
   profile: Profile | null;
   targets: Targets | null;
   weighInDue: boolean;
+  google: Me["google"];
 };
 
 type Result = { ok: true } | { ok: false; error: string };
 
-const SIGNED_OUT: AuthState = { user: null, profile: null, targets: null, weighInDue: false };
+const SIGNED_OUT: AuthState = { user: null, profile: null, targets: null, weighInDue: false, google: null };
 
 export const ME_PATH = "/me";
 
@@ -67,46 +68,95 @@ async function authenticate(path: string, body: unknown): Promise<Result> {
   }
 }
 
-// Login com Google: o backend conduz o OAuth (e guarda o acesso à Google Health API). O front só
-// manda o navegador para o backend e, na volta em /login/google, troca o código de uso único pelo token.
+// Google: o backend conduz o OAuth e guarda o acesso à Google Health API; o front nunca vê os tokens do
+// Google. Dois fluxos: entrar com Google (volta em /login/google) e conectar a conta já logada (volta
+// em /perfil/google).
 const GOOGLE_STATE_KEY = "nutriai:google-state";
+const GOOGLE_INVALID_RETURN = "Não foi possível confirmar a volta do Google. Tente novamente.";
 
-/** Página para onde o backend devolve o navegador depois do Google. */
-function googleRedirectUri() {
-  return `${window.location.origin}/login/google`;
+/** Página do front para onde o backend devolve o navegador depois do Google. */
+function googleRedirectUri(page: "/login/google" | "/perfil/google") {
+  return `${window.location.origin}${page}`;
 }
 
-/** Sai do app e vai para a tela de consentimento do Google (via backend). */
-export function signInWithGoogle() {
-  // `state` aleatório: na volta, confirma que o login foi iniciado por esta aba (evita CSRF de login).
+/**
+ * `state` aleatório guardado na aba: na volta, confirma que o fluxo foi iniciado aqui (evita CSRF).
+ * Sem sessionStorage a volta falha na verificação e o usuário vê o erro.
+ */
+function newGoogleState() {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   const state = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
   try {
     window.sessionStorage.setItem(GOOGLE_STATE_KEY, state);
   } catch {
-    // Sem sessionStorage a volta falha na verificação e o usuário vê o erro.
+    // Ver acima.
   }
-  const params = new URLSearchParams({ redirect_uri: googleRedirectUri(), state });
+  return state;
+}
+
+/** Confere o `state` da volta (só vale uma vez). */
+function checkGoogleState(params: URLSearchParams) {
+  let expected: string | null = null;
+  try {
+    expected = window.sessionStorage.getItem(GOOGLE_STATE_KEY);
+    window.sessionStorage.removeItem(GOOGLE_STATE_KEY);
+  } catch {
+    // Tratado como estado inválido.
+  }
+  return expected !== null && params.get("state") === expected;
+}
+
+/** Sai do app e vai para a tela de consentimento do Google (via backend) para entrar ou criar conta. */
+export function signInWithGoogle() {
+  const params = new URLSearchParams({ redirect_uri: googleRedirectUri("/login/google"), state: newGoogleState() });
   window.location.assign(apiUrl(`/auth/google/start?${params}`));
 }
 
-/** Volta do Google: `?code=...&state=...` em caso de sucesso, `?error=...` se falhou ou foi cancelado. */
+/** Volta do login: `?code=...&state=...` em caso de sucesso, `?error=...` se falhou ou foi cancelado. */
 export async function completeGoogleSignIn(params: URLSearchParams): Promise<Result> {
-  let expectedState: string | null = null;
-  try {
-    expectedState = window.sessionStorage.getItem(GOOGLE_STATE_KEY);
-    window.sessionStorage.removeItem(GOOGLE_STATE_KEY);
-  } catch {
-    // Tratado abaixo como estado inválido.
-  }
-
+  const validState = checkGoogleState(params);
   const error = params.get("error");
   if (error) return { ok: false, error };
   const code = params.get("code");
-  if (!code || !expectedState || params.get("state") !== expectedState) {
-    return { ok: false, error: "Não foi possível confirmar o login com o Google. Tente novamente." };
+  if (!code || !validState) return { ok: false, error: GOOGLE_INVALID_RETURN };
+  return authenticate("/auth/google/exchange", { code, redirectUri: googleRedirectUri("/login/google") });
+}
+
+/**
+ * Conecta o Google à conta já logada (necessário para os dados da Google Health API). O backend
+ * devolve a URL de consentimento, porque a navegação do navegador não leva o token da sessão.
+ */
+export async function connectGoogle(): Promise<Result> {
+  try {
+    const { url } = await apiFetch<GoogleLinkResponse>("/me/google/link", {
+      method: "POST",
+      body: { redirectUri: googleRedirectUri("/perfil/google"), state: newGoogleState() },
+    });
+    window.location.assign(url);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof ApiError ? error.message : "Erro inesperado." };
   }
-  return authenticate("/auth/google/exchange", { code, redirectUri: googleRedirectUri() });
+}
+
+/** Volta da conexão: `?connected=1&state=...` em caso de sucesso, `?error=...` se falhou ou foi cancelado. */
+export function completeGoogleConnect(params: URLSearchParams): Result {
+  const validState = checkGoogleState(params);
+  const error = params.get("error");
+  if (error) return { ok: false, error };
+  if (params.get("connected") !== "1" || !validState) return { ok: false, error: GOOGLE_INVALID_RETURN };
+  // /me passa a ter `google`, e atividade e calorias gastas passam a vir da Google Health API.
+  invalidate(ME_PATH, "/history", "/nutrition", "/activity-sources");
+  return { ok: true };
+}
+
+/** Desconecta o Google: o backend apaga os tokens e para de importar os dados. `false` se falhou. */
+export async function disconnectGoogle() {
+  const me = await mutate<Me>("/me/google", "DELETE", undefined, {
+    update: ME_PATH,
+    invalidate: ["/history", "/nutrition", "/activity-sources"],
+  });
+  return me !== null;
 }
 
 export function signOut() {

@@ -107,6 +107,35 @@ Não coloque o token da sessão na URL: ela fica no histórico do navegador e em
 Resposta `200`: `{ "token": "..." }`, igual ao login. Código inválido, expirado, já usado ou com outro
 `redirectUri` → `400` `{ "error": "O login com o Google expirou. Tente novamente." }`.
 
+#### Conectar o Google a uma conta existente 🔒
+
+Quem se cadastrou com usuário e senha conecta o Google no card "Google Health" do `/perfil` — é o que dá
+acesso aos dados da Google Health API. Como a navegação do navegador não leva o `Authorization`, o front
+pede a URL antes, com `fetch`:
+
+`POST /me/google/link`
+
+```json
+{ "redirectUri": "https://<front>/perfil/google", "state": "<aleatório do front>" }
+```
+
+Resposta `200`: `{ "url": "https://accounts.google.com/o/oauth2/v2/auth?..." }` — a URL de consentimento, já
+com os mesmos escopos e parâmetros do login e com um `state` do backend que identifica **este usuário**
+(ex.: assinado e de curta duração), o `redirectUri` (mesma lista permitida) e o `state` do front. O front
+redireciona o navegador para ela.
+
+No callback do backend (o mesmo `GET /auth/google/callback`, distinguindo pelo `state`): liga o `sub` do
+Google a esse usuário, guarda os tokens e redireciona para `{redirectUri}?connected=1&state=<state do front>`.
+Erros, cancelamento ou conta Google já ligada a **outro** usuário do NutriAI → `{redirectUri}?error=<mensagem>&state=...`
+(ex.: `Essa conta Google já está conectada a outro usuário.`).
+
+Depois de conectado, "Continuar com o Google" no `/login` entra nessa mesma conta (o backend acha o usuário
+pelo `sub`).
+
+`DELETE /me/google` → `Me`: desconecta (apaga os tokens do Google e para de importar). Contas criadas pelo
+Google não têm senha: recuse com `409` (`me.google.canDisconnect` é `false` para elas, e o front nem mostra o
+botão).
+
 #### Dados da Google Health API
 
 Com os tokens guardados, o backend busca os dados de saúde do usuário e os usa em `/history/activity`,
@@ -130,7 +159,8 @@ Com os tokens guardados, o backend busca os dados de saúde do usuário e os usa
     "weighInDay": 1
   },
   "targets": { "calories": 1660, "bmr": 1395, "tdee": 2163, "waterLiters": 2.4, "clampedToMinimum": false },
-  "weighInDue": true
+  "weighInDue": true,
+  "google": { "email": "ana@gmail.com", "canDisconnect": true }
 }
 ```
 
@@ -138,6 +168,8 @@ Com os tokens guardados, o backend busca os dados de saúde do usuário e os usa
 - `profile.sex`: `feminino | masculino`; `activityLevel`: `sedentario | leve | moderado | intenso | extremo`;
   `goal`: `perder | manter | ganhar`; `mealsPerDay`: 3–6; `weighInDay`: 0 = domingo … 6 = sábado.
 - `weighInDue`: hoje (no fuso do usuário) é `profile.weighInDay` **e** não há pesagem registrada hoje.
+- `google`: conta Google conectada (`null` se não houver). `canDisconnect` é `false` quando a conta foi criada
+  pelo Google (é o único jeito de entrar).
 
 ### `PUT /me/profile` → `Me`
 

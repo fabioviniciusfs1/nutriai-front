@@ -27,9 +27,17 @@ export type Me = {
   targets: Targets | null;
   /** Hoje é o dia de pesagem do perfil e ainda não há peso registrado hoje. */
   weighInDue: boolean;
+  /**
+   * Conta Google conectada (dá acesso à Google Health API); `null` se não houver.
+   * `canDisconnect` é `false` quando o Google é o único jeito de entrar (conta criada pelo Google).
+   */
+  google: { email: string; canDisconnect: boolean } | null;
 };
 
 export type AuthResponse = { token: string };
+
+/** URL de consentimento do Google para conectar a conta já logada. */
+export type GoogleLinkResponse = { url: string };
 
 /** Peso registrado pelo usuário. Só histórico: não altera `profile.weightKg` nem a meta calórica. */
 export type WeightEntry = {
