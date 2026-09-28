@@ -196,9 +196,6 @@ export function LoginForm() {
         <GoogleIcon />
         {redirecting ? "Abrindo o Google…" : "Continuar com o Google"}
       </button>
-      <p className="mt-2 text-center text-xs text-neutral-500">
-        Permite importar seus dados de atividade do Google Health.
-      </p>
     </div>
   );
 }
