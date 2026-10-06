@@ -1,15 +1,12 @@
 "use client";
 
 import { MoreHorizontal, GlassWater, Flame } from "lucide-react";
-import { activityHistory, macroBreakdown } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth";
-import { calculateCalorieTarget, calculateWaterLiters } from "@/lib/calorie-target";
+import { useApiQuery } from "@/lib/api/query";
+import type { NutritionToday } from "@/lib/api/types";
+import { MACRO_COLORS } from "@/lib/nutrients";
+import { QueryStatus } from "@/components/api/QueryStatus";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
-
-// Calorias de hoje (simuladas): consumidas a partir dos macros já ingeridos e gastas a partir do
-// último dia de atividade (Google Fit / Apple Saúde).
-const consumedKcal = macroBreakdown.reduce((sum, macro) => sum + macro.atual * macro.kcalPerGram, 0);
-const today = activityHistory[activityHistory.length - 1];
 
 // Semicírculo de raio 80 centrado em (100, 100); `pathLength` 100 deixa o progresso em %.
 const ARC = "M 20 100 A 80 80 0 0 1 180 100";
@@ -17,11 +14,20 @@ const ARC = "M 20 100 A 80 80 0 0 1 180 100";
 const numberFormat = new Intl.NumberFormat("pt-BR");
 
 export function MacroDonut() {
-  const profile = useAuth()?.profile;
-  const target = profile ? calculateCalorieTarget(profile).target : null;
+  const nutrition = useApiQuery<NutritionToday>("/nutrition/today");
+  if (!nutrition.data) return <QueryStatus title="Meta diária" error={nutrition.error} onRetry={nutrition.reload} />;
+  return <MacroDonutCard nutrition={nutrition.data} />;
+}
+
+function MacroDonutCard({ nutrition }: { nutrition: NutritionToday }) {
+  // Metas do perfil (calculadas pelo backend) e consumo/gasto de hoje.
+  const targets = useAuth()?.targets;
+  const consumed = nutrition.consumedKcal;
+  const burned = nutrition.burnedKcal;
+  const target = targets?.calories ?? null;
   const calorieGoal = target ? `${numberFormat.format(target)} kcal` : "—";
-  const waterGoal = profile ? `${numberFormat.format(calculateWaterLiters(profile.weightKg))} L` : "—";
-  const percent = target ? Math.round((consumedKcal / target) * 100) : 0;
+  const waterGoal = targets ? `${numberFormat.format(targets.waterLiters)} L` : "—";
+  const percent = target ? Math.round((consumed / target) * 100) : 0;
 
   return (
     <div className="flex h-full flex-col rounded-2xl bg-white p-5 shadow-sm">
@@ -45,7 +51,7 @@ export function MacroDonut() {
               role="img"
               aria-label={
                 target
-                  ? `${numberFormat.format(consumedKcal)} de ${numberFormat.format(target)} kcal consumidas (${percent}%)`
+                  ? `${numberFormat.format(consumed)} de ${numberFormat.format(target)} kcal consumidas (${percent}%)`
                   : "Calorias consumidas"
               }
             >
@@ -65,7 +71,7 @@ export function MacroDonut() {
             </svg>
             <div className="absolute inset-x-0 bottom-0 flex flex-col items-center">
               <span className="text-2xl font-bold tabular-nums text-neutral-900 sm:text-3xl">
-                {numberFormat.format(consumedKcal)}
+                {numberFormat.format(consumed)}
               </span>
               <span className="text-xs text-neutral-500">kcal consumidas</span>
             </div>
@@ -75,22 +81,35 @@ export function MacroDonut() {
             <Flame size={16} className="text-accent" />
             <span className="text-neutral-700">Calorias gastas</span>
             <span className="ml-auto font-semibold tabular-nums text-neutral-900">
-              {numberFormat.format(today.burned)} kcal
+              {burned === null ? "—" : `${numberFormat.format(burned)} kcal`}
             </span>
           </div>
         </div>
 
         <div className="flex w-full flex-1 flex-col gap-3">
-          {macroBreakdown.map((macro) => (
-            <ProgressBar
-              key={macro.name}
-              label={macro.name}
-              atual={macro.atual}
-              meta={macro.meta}
-              unit="g"
-              color={macro.color}
-            />
-          ))}
+          {nutrition.macros.map((macro) =>
+            // Com perfil, em g por kg de peso (vem pronto do backend); sem perfil, em gramas.
+            macro.perKg ? (
+              <ProgressBar
+                key={macro.id}
+                label={macro.name}
+                atual={macro.perKg.atual}
+                meta={macro.perKg.meta}
+                unit=" g/kg"
+                fractionDigits={1}
+                color={MACRO_COLORS[macro.id]}
+              />
+            ) : (
+              <ProgressBar
+                key={macro.id}
+                label={macro.name}
+                atual={macro.atual}
+                meta={macro.meta}
+                unit="g"
+                color={MACRO_COLORS[macro.id]}
+              />
+            )
+          )}
 
           <div className="mt-1 flex items-center gap-2 border-t border-neutral-100 pt-3 text-sm">
             <GlassWater size={16} className="text-[#7fc1e8]" />

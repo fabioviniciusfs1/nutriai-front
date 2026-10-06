@@ -1,168 +1,37 @@
-// Autenticação simulada no navegador: contas, sessão e perfil ficam no localStorage.
-// NÃO é segura — serve só para prototipar o fluxo até existir um backend.
-import { useSyncExternalStore } from "react";
-import type { Profile } from "@/lib/calorie-target";
-import type { FoodFeedback } from "@/lib/food-feedback";
-import type { mealPlan } from "@/lib/mock-data";
-
-const USERS_KEY = "nutriai:users";
-const SESSION_KEY = "nutriai:session";
-
-/** Peso registrado pelo usuário. Só histórico: não altera `profile.weightKg` nem a meta calórica. */
-export type WeightEntry = {
-  id: string;
-  /** Data/hora da pesagem em ISO 8601. */
-  at: string;
-  kg: number;
-};
-
-type PlanFoods = (typeof mealPlan)[number]["foods"];
-
-/**
- * Mudanças permanentes no plano, até o usuário desfazer: refeições removidas com "não fazer nada",
- * refeições criadas e alimentos acrescentados. Criar/acrescentar tira as calorias das outras
- * refeições (reduzindo as porções), para o total do dia não aumentar.
- */
-export type PlanChanges = {
-  /** Refeições do plano base removidas com "não fazer nada" (para voltar, só criando outra). */
-  removed: number[];
-  /** Refeições criadas pelo usuário: nome e horário dele, alimentos sugeridos pelo sistema. */
-  added: {
-    id: number;
-    title: string;
-    time: string;
-    /** Nome da sugestão de onde vieram os alimentos. */
-    suggestion: string;
-    foods: PlanFoods;
-  }[];
-  /**
-   * Alimentos acrescentados pelo usuário a cada refeição (id → alimentos), na porção "base" (fator 1):
-   * mudam junto com as porções da refeição.
-   */
-  extraFoods: Record<number, PlanFoods>;
-  /** Fator permanente das porções de cada refeição (id → fator). */
-  scales: Record<number, number>;
-};
-
-export const EMPTY_PLAN_CHANGES: PlanChanges = {
-  removed: [],
-  added: [],
-  extraFoods: {},
-  scales: {},
-};
-
-/** Mudanças que valem só no dia em que foram feitas ("sugerir uma nova" e "redistribuir"). */
-export type DayPlanChanges = {
-  /** Removidas hoje com "redistribuir". */
-  removed: number[];
-  /** Trocadas hoje por outra sugestão. */
-  replacements: Record<number, { title: string; foods: PlanFoods }>;
-  /**
-   * Fator das porções só de hoje (id → fator), multiplicado pelo permanente: ao remover com
-   * "redistribuir", as refeições seguintes aumentam para receber as calorias.
-   */
-  scales: Record<number, number>;
-};
-
-export const EMPTY_DAY_PLAN: DayPlanChanges = {
-  removed: [],
-  replacements: {},
-  scales: {},
-};
-
-/** Data local "AAAA-MM-DD": as mudanças do plano valem só para o dia em que foram feitas. */
-function today() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-}
-
-type StoredUser = {
-  name: string;
-  username: string;
-  passwordHash: string;
-  profile: Profile | null;
-  /** Horário escolhido pelo usuário para cada refeição do plano (id da refeição → "HH:MM"). */
-  mealTimes?: Record<number, string>;
-  weights?: WeightEntry[];
-  planChanges?: PlanChanges;
-  /** Mudanças do plano de um dia; em outro dia são ignoradas. */
-  dayPlan?: { date: string; changes: DayPlanChanges };
-  /**
-   * Alimentos restritos ("Não gosto / Não quero / Não tenho"): o assistente não os recomenda até o
-   * usuário liberar na página Alimentos. Liberar não desfaz trocas já feitas.
-   */
-  foodFeedback?: Record<string, FoodFeedback>;
-  /**
-   * Trocas permanentes de "Não gosto" e "Não tenho" em todas as refeições (nome → substituto;
-   * "" = sai sem substituto). Continuam valendo mesmo depois de o alimento ser liberado.
-   */
-  foodSubstitutes?: Record<string, string>;
-  /**
-   * Trocas permanentes de "Não quero", só na refeição marcada (id da refeição → alimento →
-   * substituto; "" = sai sem substituto). Ex.: um alimento que aparece em 3 refeições e é marcado
-   * em uma passa a ser comido 2 vezes por dia, todos os dias.
-   */
-  mealFoodSwaps?: Record<number, Record<string, string>>;
-};
+// Sessão: o token fica no localStorage e os dados do usuário vêm de `GET /me`.
+import { ApiError, apiFetch, apiUrl, setToken, useToken } from "@/lib/api/client";
+import { invalidate, mutate, useApiQuery } from "@/lib/api/query";
+import type { AuthResponse, GoogleLinkResponse, Me, Targets } from "@/lib/api/types";
+import type { Profile } from "@/lib/profile";
 
 export type AuthState = {
   user: { name: string; username: string } | null;
   profile: Profile | null;
-  mealTimes: Record<number, string>;
-  /** Ordenados do mais antigo para o mais recente. */
-  weights: WeightEntry[];
-  planChanges: PlanChanges;
-  /** Mudanças do plano de hoje (vazio se não houver ou se forem de outro dia). */
-  dayPlan: DayPlanChanges;
-  foodFeedback: Record<string, FoodFeedback>;
-  foodSubstitutes: Record<string, string>;
-  mealFoodSwaps: Record<number, Record<string, string>>;
+  targets: Targets | null;
+  weighInDue: boolean;
+  google: Me["google"];
 };
 
 type Result = { ok: true } | { ok: false; error: string };
 
-const listeners = new Set<() => void>();
+const SIGNED_OUT: AuthState = { user: null, profile: null, targets: null, weighInDue: false, google: null };
 
-function readStorage(key: string) {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
+export const ME_PATH = "/me";
+
+/**
+ * `undefined` enquanto a sessão não foi carregada (render no servidor, hidratação e `GET /me`).
+ * `error` preenchido se `GET /me` falhou (ex.: backend fora do ar); `retry` tenta de novo.
+ */
+export function useSession(): { auth: AuthState | undefined; error: ApiError | undefined; retry: () => void } {
+  const token = useToken();
+  const me = useApiQuery<Me>(token ? ME_PATH : null);
+  if (token === undefined) return { auth: undefined, error: undefined, retry: me.reload };
+  if (token === null) return { auth: SIGNED_OUT, error: undefined, retry: me.reload };
+  return { auth: me.data, error: me.error, retry: me.reload };
 }
 
-function readUsers(): Record<string, StoredUser> {
-  try {
-    return JSON.parse(readStorage(USERS_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-}
-
-function write(key: string, value: string | null) {
-  try {
-    if (value === null) window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, value);
-  } catch {
-    // Armazenamento indisponível (ex.: navegação privada bloqueada): a sessão só dura até recarregar.
-  }
-  listeners.forEach((listener) => listener());
-}
-
-function writeUsers(users: Record<string, StoredUser>) {
-  write(USERS_KEY, JSON.stringify(users));
-}
-
-async function hashPassword(username: string, password: string) {
-  const data = new TextEncoder().encode(`nutriai:${username}:${password}`);
-  if (globalThis.crypto?.subtle) {
-    const digest = await crypto.subtle.digest("SHA-256", data);
-    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-  }
-  // crypto.subtle só existe em contexto seguro (https ou localhost); fallback para acesso via IP na rede local.
-  let hash = 0x811c9dc5;
-  for (const byte of data) hash = Math.imul(hash ^ byte, 0x01000193);
-  return `fnv:${(hash >>> 0).toString(16)}`;
+export function useAuth(): AuthState | undefined {
+  return useSession().auth;
 }
 
 export function getInitials(name: string) {
@@ -182,177 +51,123 @@ export async function signUp(name: string, rawUsername: string, password: string
   }
   if (password.length < 6) return { ok: false, error: "A senha deve ter pelo menos 6 caracteres." };
 
-  const users = readUsers();
-  if (users[username]) return { ok: false, error: "Esse usuário já está em uso." };
-
-  users[username] = {
-    name: name.trim(),
-    username,
-    passwordHash: await hashPassword(username, password),
-    profile: null,
-  };
-  writeUsers(users);
-  write(SESSION_KEY, username);
-  return { ok: true };
+  return authenticate("/auth/signup", { name: name.trim(), username, password });
 }
 
 export async function signIn(rawUsername: string, password: string): Promise<Result> {
-  const username = normalizeUsername(rawUsername);
-  const user = readUsers()[username];
-  if (!user || user.passwordHash !== (await hashPassword(username, password))) {
-    return { ok: false, error: "Usuário ou senha incorretos." };
+  return authenticate("/auth/login", { username: normalizeUsername(rawUsername), password });
+}
+
+async function authenticate(path: string, body: unknown): Promise<Result> {
+  try {
+    const { token } = await apiFetch<AuthResponse>(path, { method: "POST", body });
+    setToken(token);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof ApiError ? error.message : "Erro inesperado." };
   }
-  write(SESSION_KEY, username);
+}
+
+// Google: o backend conduz o OAuth e guarda o acesso à Google Health API; o front nunca vê os tokens do
+// Google. Dois fluxos: entrar com Google (volta em /login/google) e conectar a conta já logada (volta
+// em /perfil/google).
+const GOOGLE_STATE_KEY = "nutriai:google-state";
+const GOOGLE_INVALID_RETURN = "Não foi possível confirmar a volta do Google. Tente novamente.";
+
+/** Página do front para onde o backend devolve o navegador depois do Google. */
+function googleRedirectUri(page: "/login/google" | "/perfil/google") {
+  return `${window.location.origin}${page}`;
+}
+
+/**
+ * `state` aleatório guardado na aba: na volta, confirma que o fluxo foi iniciado aqui (evita CSRF).
+ * Sem sessionStorage a volta falha na verificação e o usuário vê o erro.
+ */
+function newGoogleState() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const state = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  try {
+    window.sessionStorage.setItem(GOOGLE_STATE_KEY, state);
+  } catch {
+    // Ver acima.
+  }
+  return state;
+}
+
+/** Confere o `state` da volta (só vale uma vez). */
+function checkGoogleState(params: URLSearchParams) {
+  let expected: string | null = null;
+  try {
+    expected = window.sessionStorage.getItem(GOOGLE_STATE_KEY);
+    window.sessionStorage.removeItem(GOOGLE_STATE_KEY);
+  } catch {
+    // Tratado como estado inválido.
+  }
+  return expected !== null && params.get("state") === expected;
+}
+
+/** Sai do app e vai para a tela de consentimento do Google (via backend) para entrar ou criar conta. */
+export function signInWithGoogle() {
+  const params = new URLSearchParams({ redirect_uri: googleRedirectUri("/login/google"), state: newGoogleState() });
+  window.location.assign(apiUrl(`/auth/google/start?${params}`));
+}
+
+/** Volta do login: `?code=...&state=...` em caso de sucesso, `?error=...` se falhou ou foi cancelado. */
+export async function completeGoogleSignIn(params: URLSearchParams): Promise<Result> {
+  const validState = checkGoogleState(params);
+  const error = params.get("error");
+  if (error) return { ok: false, error };
+  const code = params.get("code");
+  if (!code || !validState) return { ok: false, error: GOOGLE_INVALID_RETURN };
+  return authenticate("/auth/google/exchange", { code, redirectUri: googleRedirectUri("/login/google") });
+}
+
+/**
+ * Conecta o Google à conta já logada (necessário para os dados da Google Health API). O backend
+ * devolve a URL de consentimento, porque a navegação do navegador não leva o token da sessão.
+ */
+export async function connectGoogle(): Promise<Result> {
+  try {
+    const { url } = await apiFetch<GoogleLinkResponse>("/me/google/link", {
+      method: "POST",
+      body: { redirectUri: googleRedirectUri("/perfil/google"), state: newGoogleState() },
+    });
+    window.location.assign(url);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof ApiError ? error.message : "Erro inesperado." };
+  }
+}
+
+/** Volta da conexão: `?connected=1&state=...` em caso de sucesso, `?error=...` se falhou ou foi cancelado. */
+export function completeGoogleConnect(params: URLSearchParams): Result {
+  const validState = checkGoogleState(params);
+  const error = params.get("error");
+  if (error) return { ok: false, error };
+  if (params.get("connected") !== "1" || !validState) return { ok: false, error: GOOGLE_INVALID_RETURN };
+  // /me passa a ter `google`, e atividade e calorias gastas passam a vir da Google Health API.
+  invalidate(ME_PATH, "/history", "/nutrition", "/activity-sources");
   return { ok: true };
 }
 
-export function signOut() {
-  write(SESSION_KEY, null);
-}
-
-export function saveProfile(profile: Profile) {
-  const username = readStorage(SESSION_KEY);
-  const users = readUsers();
-  if (!username || !users[username]) return;
-  users[username] = { ...users[username], profile };
-  writeUsers(users);
-}
-
-export function saveMealTime(mealId: number, time: string) {
-  const username = readStorage(SESSION_KEY);
-  const users = readUsers();
-  if (!username || !users[username]) return;
-  users[username] = { ...users[username], mealTimes: { ...users[username].mealTimes, [mealId]: time } };
-  writeUsers(users);
-}
-
-export function addWeightEntry(kg: number, at: Date) {
-  const username = readStorage(SESSION_KEY);
-  const users = readUsers();
-  if (!username || !users[username]) return;
-  const entry: WeightEntry = { id: `${at.getTime()}-${Math.random().toString(36).slice(2, 8)}`, at: at.toISOString(), kg };
-  users[username] = { ...users[username], weights: [...(users[username].weights ?? []), entry] };
-  writeUsers(users);
-}
-
-export function saveDayPlanChanges(changes: DayPlanChanges) {
-  const username = readStorage(SESSION_KEY);
-  const users = readUsers();
-  if (!username || !users[username]) return;
-  users[username] = { ...users[username], dayPlan: { date: today(), changes } };
-  writeUsers(users);
-}
-
-export function savePlanChanges(changes: PlanChanges) {
-  updateUser((user) => ({ ...user, planChanges: changes }));
-}
-
-function updateUser(update: (user: StoredUser) => StoredUser) {
-  const username = readStorage(SESSION_KEY);
-  const users = readUsers();
-  if (!username || !users[username]) return;
-  users[username] = update(users[username]);
-  writeUsers(users);
-}
-
-/**
- * "Não gosto" / "Não tenho": o alimento é trocado por `substitute` em todas as refeições, de forma
- * permanente (`null` = sai sem substituto), e fica restrito para o assistente.
- */
-export function markFoodEverywhere(foodName: string, value: FoodFeedback, substitute: string | null) {
-  updateUser((user) => ({
-    ...user,
-    foodFeedback: { ...user.foodFeedback, [foodName]: value },
-    foodSubstitutes: { ...user.foodSubstitutes, [foodName]: substitute ?? "" },
-  }));
-}
-
-/**
- * "Não quero": troca o alimento só na refeição `mealId`, de forma permanente (as outras refeições
- * continuam com ele). O alimento fica restrito para o assistente, sem sobrescrever uma marcação
- * "Não gosto"/"Não tenho" que já exista.
- */
-export function markFoodInMeal(mealId: number, foodName: string, substitute: string | null) {
-  updateUser((user) => ({
-    ...user,
-    foodFeedback: { ...user.foodFeedback, [foodName]: user.foodFeedback?.[foodName] ?? "nao-quero" },
-    mealFoodSwaps: {
-      ...user.mealFoodSwaps,
-      [mealId]: { ...user.mealFoodSwaps?.[mealId], [foodName]: substitute ?? "" },
-    },
-  }));
-}
-
-/** Libera o alimento para o assistente voltar a recomendá-lo. Trocas já feitas continuam. */
-export function releaseFood(foodName: string) {
-  updateUser((user) => {
-    const foodFeedback = { ...user.foodFeedback };
-    delete foodFeedback[foodName];
-    return { ...user, foodFeedback };
+/** Desconecta o Google: o backend apaga os tokens e para de importar os dados. `false` se falhou. */
+export async function disconnectGoogle() {
+  const me = await mutate<Me>("/me/google", "DELETE", undefined, {
+    update: ME_PATH,
+    invalidate: ["/history", "/nutrition", "/activity-sources"],
   });
+  return me !== null;
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  // Mantém abas diferentes sincronizadas (login/logout em outra aba).
-  window.addEventListener("storage", listener);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener("storage", listener);
-  };
+export function signOut() {
+  setToken(null);
 }
 
-let cachedKey: string | undefined;
-const SIGNED_OUT: AuthState = {
-  user: null,
-  profile: null,
-  mealTimes: {},
-  weights: [],
-  planChanges: EMPTY_PLAN_CHANGES,
-  dayPlan: EMPTY_DAY_PLAN,
-  foodFeedback: {},
-  foodSubstitutes: {},
-  mealFoodSwaps: {},
-};
-
-let cachedState: AuthState = SIGNED_OUT;
-
-/** Só os campos de hoje: planos salvos em versões antigas também traziam refeições criadas. */
-function dayChanges(changes: Partial<DayPlanChanges>): DayPlanChanges {
-  return {
-    removed: changes.removed ?? [],
-    replacements: changes.replacements ?? {},
-    scales: changes.scales ?? {},
-  };
-}
-
-function getSnapshot(): AuthState {
-  const usersRaw = readStorage(USERS_KEY);
-  const session = readStorage(SESSION_KEY);
-  // A data entra na chave para o plano voltar ao base quando o dia vira.
-  const key = `${session}|${today()}|${usersRaw}`;
-  if (key === cachedKey) return cachedState;
-
-  const user = session ? readUsers()[session] : undefined;
-  cachedKey = key;
-  cachedState = user
-    ? {
-        user: { name: user.name, username: user.username },
-        profile: user.profile,
-        mealTimes: user.mealTimes ?? {},
-        weights: [...(user.weights ?? [])].sort((a, b) => a.at.localeCompare(b.at)),
-        // Mescla com o vazio: planos salvos antes de um campo existir (ex.: `added`) continuam válidos.
-        planChanges: { ...EMPTY_PLAN_CHANGES, ...user.planChanges },
-        dayPlan: user.dayPlan?.date === today() ? dayChanges(user.dayPlan.changes) : EMPTY_DAY_PLAN,
-        foodFeedback: user.foodFeedback ?? {},
-        foodSubstitutes: user.foodSubstitutes ?? {},
-        mealFoodSwaps: user.mealFoodSwaps ?? {},
-      }
-    : SIGNED_OUT;
-  return cachedState;
-}
-
-/** `undefined` enquanto o estado do navegador ainda não foi lido (render no servidor e hidratação). */
-export function useAuth(): AuthState | undefined {
-  return useSyncExternalStore(subscribe, getSnapshot, () => undefined);
+/** Salva o perfil; o backend recalcula as metas e o plano. `false` se falhou. */
+export async function saveProfile(profile: Profile) {
+  const me = await mutate<Me>("/me/profile", "PUT", profile, {
+    update: ME_PATH,
+    invalidate: ["/plan", "/nutrition", "/history"],
+  });
+  return me !== null;
 }

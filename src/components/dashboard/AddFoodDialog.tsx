@@ -2,73 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
-import { foodCatalog } from "@/lib/mock-data";
-import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
-import type { PlanFood } from "@/lib/food-substitution";
-
-/** O que acontece no plano se o alimento for acrescentado — mostrado antes de confirmar. */
-export type AddFoodPreview = {
-  /** O alimento na porção escolhida pelo assistente. */
-  food: PlanFood;
-  /** Quanto as porções das refeições diminuem (%). */
-  reductionPercent: number;
-  factor: number;
-};
+import { ApiError, apiFetch } from "@/lib/api/client";
+import type { FoodSearchResult } from "@/lib/api/types";
+import { FOOD_FEEDBACK } from "@/lib/food-feedback";
 
 type AddFoodDialogProps = {
-  open: boolean;
+  /** Refeição que recebe o alimento; `null` = diálogo fechado. */
+  mealId: number | null;
   mealTitle: string;
-  /** Alimentos restritos ("Não gosto / Não quero / Não tenho") não podem ser acrescentados. */
-  feedback: Record<string, FoodFeedback>;
-  preview: (foodName: string) => AddFoodPreview | null;
-  onConfirm: (foodName: string) => void;
+  onConfirm: (foodName: string) => Promise<void>;
   onCancel: () => void;
 };
 
-/** Quantas sugestões mostrar quando o alimento não está na base. */
-const MAX_SUGGESTIONS = 5;
-
-/** Compara nomes sem diferenciar maiúsculas nem acentos ("feijao" encontra "Feijão"). */
-function normalize(text: string) {
-  return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").trim().toLowerCase();
-}
-
-function bigrams(text: string) {
-  const letters = normalize(text).replace(/[^a-z0-9]/g, "");
-  return Array.from({ length: Math.max(0, letters.length - 1) }, (_, i) => letters.slice(i, i + 2));
-}
-
-/** Semelhança entre 0 e 1 pelos pares de letras em comum ("banan" ≈ "Banana-prata"). */
-function similarity(a: string, b: string) {
-  const pairsA = bigrams(a);
-  const pairsB = bigrams(b);
-  if (pairsA.length === 0 || pairsB.length === 0) return 0;
-  const remaining = [...pairsB];
-  let common = 0;
-  for (const pair of pairsA) {
-    const index = remaining.indexOf(pair);
-    if (index >= 0) {
-      common++;
-      remaining.splice(index, 1);
-    }
-  }
-  return (2 * common) / (pairsA.length + pairsB.length);
-}
-
-type SearchResult = {
-  query: string;
-  /** Se o texto bateu com alimentos da base; senão, `options` são sugestões parecidas. */
-  found: boolean;
-  /** Marcação do alimento digitado, se ele existe mas está restrito. */
-  restricted: { name: string; label: string } | null;
-  options: PlanFood[];
-};
-
-export function AddFoodDialog({ open, mealTitle, feedback, preview, onConfirm, onCancel }: AddFoodDialogProps) {
+export function AddFoodDialog({ mealId, mealTitle, onConfirm, onCancel }: AddFoodDialogProps) {
+  const open = mealId !== null;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState("");
-  const [result, setResult] = useState<SearchResult | null>(null);
+  const [result, setResult] = useState<(FoodSearchResult & { query: string }) | null>(null);
   const [choice, setChoice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -77,44 +30,38 @@ export function AddFoodDialog({ open, mealTitle, feedback, preview, onConfirm, o
       setName("");
       setResult(null);
       setChoice(null);
+      setBusy(false);
+      setError(null);
       dialog.showModal();
     }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  function search() {
-    // Com o backend, o assistente de IA reconhece o alimento; aqui a busca é no catálogo.
-    const query = normalize(name);
-    const allowed = foodCatalog.filter((food) => !feedback[food.name]);
-    const matches = allowed.filter((food) => normalize(food.name).includes(query));
-    const exactRestricted = foodCatalog.find((food) => normalize(food.name) === query && feedback[food.name]);
-    const candidates =
-      matches.length > 0
-        ? matches
-        : [...allowed]
-            .map((food) => ({ food, score: similarity(query, food.name) }))
-            .sort((a, b) => b.score - a.score)
-            .slice(0, MAX_SUGGESTIONS)
-            .map(({ food }) => food);
-
-    setResult({
-      query: name.trim(),
-      found: matches.length > 0,
-      restricted: exactRestricted
-        ? {
-            name: exactRestricted.name,
-            label: FOOD_FEEDBACK.find((item) => item.id === feedback[exactRestricted.name])?.label ?? "",
-          }
-        : null,
-      options: candidates.flatMap((food) => preview(food.name)?.food ?? []),
-    });
-    setChoice(matches.length === 1 ? matches[0].name : null);
+  /**
+   * O backend (assistente) reconhece o alimento: devolve os da base que batem com o texto, ou
+   * parecidos, cada um na porção sugerida, sem os restritos pelo usuário.
+   */
+  async function search() {
+    const query = name.trim();
+    setBusy(true);
+    setError(null);
+    try {
+      const found = await apiFetch<FoodSearchResult>(`/plan/meals/${mealId}/food-search?q=${encodeURIComponent(query)}`);
+      setResult({ ...found, query });
+      setChoice(found.found && found.options.length === 1 ? found.options[0].food.name : null);
+    } catch (searchError) {
+      setError(searchError instanceof ApiError ? searchError.message : "Erro inesperado.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  // A redução das porções depende do alimento escolhido (a porção dele muda as contas).
-  const chosen = choice ? preview(choice) : null;
+  const chosen = result?.options.find((option) => option.food.name === choice) ?? null;
+  const restrictedLabel = result?.restricted
+    ? (FOOD_FEEDBACK.find((item) => item.id === result.restricted?.feedback)?.label ?? "")
+    : "";
   // O botão principal busca; depois da busca vira "Confirmar", até o texto mudar de novo.
-  const searched = result !== null && normalize(name) === normalize(result.query);
+  const searched = result !== null && name.trim() === result.query;
 
   return (
     <dialog
@@ -130,12 +77,16 @@ export function AddFoodDialog({ open, mealTitle, feedback, preview, onConfirm, o
     >
       <form
         className="p-5"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
+          if (busy) return;
           if (searched) {
-            if (chosen) onConfirm(chosen.food.name);
+            if (!chosen) return;
+            setBusy(true);
+            await onConfirm(chosen.food.name);
+            setBusy(false);
           } else if (name.trim()) {
-            search();
+            await search();
           }
         }}
       >
@@ -158,11 +109,17 @@ export function AddFoodDialog({ open, mealTitle, feedback, preview, onConfirm, o
           className="mt-4 w-full rounded-xl bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-accent"
         />
 
+        {error && (
+          <p role="alert" className="mt-3 text-sm text-red-600">
+            {error}
+          </p>
+        )}
+
         {result && (
           <>
             <p className="mt-4 text-sm text-neutral-600">
               {result.restricted
-                ? `Você marcou ${result.restricted.name} como “${result.restricted.label}” (libere na página Alimentos para usá-lo). `
+                ? `Você marcou ${result.restricted.name} como “${restrictedLabel}” (libere na página Alimentos para usá-lo). `
                 : ""}
               {result.found
                 ? "Escolha o alimento, na porção sugerida pelo assistente:"
@@ -174,7 +131,7 @@ export function AddFoodDialog({ open, mealTitle, feedback, preview, onConfirm, o
             {result.options.length > 0 ? (
               <fieldset className="mt-3 flex min-w-0 flex-col gap-2">
                 <legend className="sr-only">Alimento</legend>
-                {result.options.map((option) => (
+                {result.options.map(({ food: option }) => (
                   <label
                     key={option.name}
                     className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${
@@ -227,7 +184,7 @@ export function AddFoodDialog({ open, mealTitle, feedback, preview, onConfirm, o
           {searched ? (
             <button
               type="submit"
-              disabled={!chosen}
+              disabled={!chosen || busy}
               className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Confirmar
@@ -235,7 +192,7 @@ export function AddFoodDialog({ open, mealTitle, feedback, preview, onConfirm, o
           ) : (
             <button
               type="submit"
-              disabled={name.trim() === ""}
+              disabled={name.trim() === "" || busy}
               className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Search size={16} /> Buscar

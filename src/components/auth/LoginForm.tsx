@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { signIn, signUp, useAuth } from "@/lib/auth";
+import { signIn, signInWithGoogle, signUp, useAuth } from "@/lib/auth";
+import { GoogleIcon } from "@/components/auth/GoogleIcon";
 
 const MODES = [
   { id: "entrar", label: "Entrar" },
@@ -26,11 +27,21 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   // Já autenticado (inclusive logo após entrar/cadastrar): segue para o perfil ou para o painel.
   useEffect(() => {
     if (auth?.user) router.replace(auth.profile ? "/" : "/perfil");
   }, [auth, router]);
+
+  // Voltar do Google pelo botão "voltar" pode restaurar a página do cache com o botão travado.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setRedirecting(false);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   function changeMode(next: Mode) {
     setMode(next);
@@ -165,6 +176,26 @@ export function LoginForm() {
           {submitting ? "Aguarde…" : mode === "entrar" ? "Entrar" : "Criar conta"}
         </button>
       </form>
+
+      <div className="my-5 flex items-center gap-3 text-xs text-neutral-400">
+        <span className="h-px flex-1 bg-neutral-200" />
+        ou
+        <span className="h-px flex-1 bg-neutral-200" />
+      </div>
+
+      {/* Com o Google, a conta é criada no primeiro acesso: serve para entrar e para cadastrar. */}
+      <button
+        type="button"
+        disabled={redirecting}
+        onClick={() => {
+          setRedirecting(true);
+          signInWithGoogle();
+        }}
+        className="flex w-full items-center justify-center gap-3 rounded-full border border-neutral-300 bg-white py-2.5 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-50 disabled:opacity-60"
+      >
+        <GoogleIcon />
+        {redirecting ? "Abrindo o Google…" : "Continuar com o Google"}
+      </button>
     </div>
   );
 }

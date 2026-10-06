@@ -14,16 +14,13 @@ import {
 } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { CircleCheck, TriangleAlert } from "lucide-react";
-import { nutrientGroups, type nutrientHistory } from "@/lib/mock-data";
+import { useApiQuery } from "@/lib/api/query";
+import type { NutrientGroup, NutrientHistory } from "@/lib/api/types";
+import { QueryStatus, Spinner } from "@/components/api/QueryStatus";
 import { formatLongDate, formatShortDate, numberFormat } from "@/components/history/format";
 
 const LINE_COLOR = "#f4623a";
-
-type NutrientChartProps = {
-  days: typeof nutrientHistory;
-};
-
-const allNutrients = nutrientGroups.flatMap((group) => group.nutrients);
+const TITLE = "Consumo de Nutrientes";
 
 /** Arredonda o topo do eixo para um valor "redondo" (múltiplo de meia potência de 10). */
 function niceCeil(value: number) {
@@ -35,18 +32,72 @@ function percentOf(value: number, meta: number) {
   return Math.round((value / meta) * 100);
 }
 
-export function NutrientChart({ days }: NutrientChartProps) {
-  const [selected, setSelected] = useState(allNutrients[0].name);
-  const nutrient = allNutrients.find((item) => item.name === selected) ?? allNutrients[0];
+/** Consumo diário de um nutriente escolhido; médias e contagens de dias vêm do backend. */
+export function NutrientChart({ period }: { period: number }) {
+  const groups = useApiQuery<NutrientGroup[]>("/nutrients/groups");
+  const [selected, setSelected] = useState<string | null>(null);
+  const allNutrients = groups.data?.flatMap((group) => group.nutrients) ?? [];
+  const selectedId = allNutrients.find((item) => item.id === selected)?.id ?? allNutrients[0]?.id ?? null;
+  const history = useApiQuery<NutrientHistory>(
+    selectedId ? `/history/nutrients/${encodeURIComponent(selectedId)}?days=${period}` : null
+  );
 
-  const data = days.map((day) => ({ date: day.date, value: day.values[nutrient.name] }));
-  const average = data.reduce((total, day) => total + day.value, 0) / data.length;
+  if (!groups.data) return <QueryStatus title={TITLE} error={groups.error} onRetry={groups.reload} />;
+  if (!selectedId) return null;
+
+  const selector = (
+    <select
+      aria-label="Nutriente"
+      value={selectedId}
+      onChange={(event) => setSelected(event.target.value)}
+      className="rounded-full border-0 bg-neutral-100 px-4 py-1.5 text-sm font-medium text-neutral-700 outline-none focus:ring-2 focus:ring-accent"
+    >
+      {groups.data.map((group) => (
+        <optgroup key={group.name} label={group.name}>
+          {group.nutrients.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.limit ? `${item.name} (limite)` : item.name}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+
+  if (history.data) return <NutrientChartCard history={history.data} selector={selector} />;
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h3 className="font-semibold text-neutral-900">{TITLE}</h3>
+        {selector}
+      </div>
+      <div className="flex h-72 flex-col items-center justify-center gap-3 text-center">
+        {history.error ? (
+          <>
+            <p className="text-sm text-neutral-600">{history.error.message}</p>
+            <button
+              type="button"
+              onClick={history.reload}
+              className="rounded-full bg-neutral-100 px-4 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-200"
+            >
+              Tentar novamente
+            </button>
+          </>
+        ) : (
+          <Spinner />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NutrientChartCard({ history, selector }: { history: NutrientHistory; selector: React.ReactNode }) {
+  const { nutrient, average, daysOverLimit, daysOnGoal } = history;
+  const data = history.days;
   const yMax = niceCeil(Math.max(nutrient.meta, ...data.map((day) => day.value)) * 1.1);
   const averageText = numberFormat.format(nutrient.meta < 10 ? Math.round(average * 10) / 10 : Math.round(average));
   // Nutrientes com limite máximo (açúcares, sódio…): ficar abaixo da linha é o bom.
   const ofTarget = nutrient.limit ? "do limite" : "da meta";
-  const daysOverLimit = data.filter((day) => day.value > nutrient.meta).length;
-  const daysOnGoal = data.filter((day) => day.value >= nutrient.meta).length;
 
   function NutrientTooltip({ active, payload, label }: TooltipContentProps<ValueType, NameType>) {
     if (!active || !payload?.length) return null;
@@ -81,9 +132,9 @@ export function NutrientChart({ days }: NutrientChartProps) {
     <div className="rounded-2xl bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-neutral-900">Consumo de Nutrientes</h3>
+          <h3 className="font-semibold text-neutral-900">{TITLE}</h3>
           <p className="mt-1 text-sm text-neutral-500">
-            Média de {averageText} {nutrient.unit}/dia · {percentOf(average, nutrient.meta)}% {ofTarget}
+            Média de {averageText} {nutrient.unit}/dia · {history.averagePercent}% {ofTarget}
           </p>
           <p className="mt-0.5 text-xs text-neutral-500">
             {nutrient.limit
@@ -93,22 +144,7 @@ export function NutrientChart({ days }: NutrientChartProps) {
               : `Meta diária: o ideal é alcançar a linha. ${daysOnGoal} de ${data.length} dias atingiram a meta.`}
           </p>
         </div>
-        <select
-          aria-label="Nutriente"
-          value={nutrient.name}
-          onChange={(event) => setSelected(event.target.value)}
-          className="rounded-full border-0 bg-neutral-100 px-4 py-1.5 text-sm font-medium text-neutral-700 outline-none focus:ring-2 focus:ring-accent"
-        >
-          {nutrientGroups.map((group) => (
-            <optgroup key={group.name} label={group.name}>
-              {group.nutrients.map((item) => (
-                <option key={item.name} value={item.name}>
-                  {item.limit ? `${item.name} (limite)` : item.name}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        {selector}
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-neutral-500">

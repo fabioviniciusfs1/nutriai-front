@@ -2,23 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
-import type { PlanFood } from "@/lib/food-substitution";
+import { useApiQuery } from "@/lib/api/query";
+import type { PlanFood } from "@/lib/api/types";
+import { Spinner } from "@/components/api/QueryStatus";
 
 type FoodFeedbackDialogProps = {
-  open: boolean;
+  /** Refeição onde o botão foi clicado ("Não quero" troca só nela); `null` = diálogo fechado. */
+  mealId: number | null;
   foodName: string;
-  /** Refeição onde o botão foi clicado; "Não quero" troca só nela. */
   mealTitle: string;
-  /** Substitutos já na porção com as mesmas calorias do alimento marcado. */
-  options: PlanFood[];
-  onConfirm: (reason: FoodFeedback, substitute: string | null) => void;
+  onConfirm: (reason: FoodFeedback, substitute: string | null) => Promise<void>;
   onCancel: () => void;
 };
 
-export function FoodFeedbackDialog({ open, foodName, mealTitle, options, onConfirm, onCancel }: FoodFeedbackDialogProps) {
+export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onCancel }: FoodFeedbackDialogProps) {
+  const open = mealId !== null;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [reason, setReason] = useState<FoodFeedback | null>(null);
   const [choice, setChoice] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  // Substitutos do mesmo grupo, já na porção com as mesmas calorias, escolhidos pelo backend.
+  const substitutes = useApiQuery<PlanFood[]>(
+    open ? `/plan/meals/${mealId}/substitutes?food=${encodeURIComponent(foodName)}` : null
+  );
+  const options = substitutes.data ?? [];
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -52,11 +59,12 @@ export function FoodFeedbackDialog({ open, foodName, mealTitle, options, onConfi
     >
       <form
         className="p-5"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
-          if (!reason) return;
-          if (!hasOptions) onConfirm(reason, null);
-          else if (choice) onConfirm(reason, choice);
+          if (!reason || !substitutes.data || (hasOptions && !choice)) return;
+          setSubmitting(true);
+          await onConfirm(reason, hasOptions ? choice : null);
+          setSubmitting(false);
         }}
       >
         <h4 className="font-semibold text-neutral-900">Substituir alimento?</h4>
@@ -89,11 +97,30 @@ export function FoodFeedbackDialog({ open, foodName, mealTitle, options, onConfi
           ))}
         </fieldset>
 
-        <p className="mt-4 text-sm text-neutral-600">
-          {hasOptions
-            ? "Escolha um substituto, com as mesmas calorias:"
-            : "Não há outros alimentos do mesmo grupo disponíveis, então ele sairá sem substituto."}
-        </p>
+        {!substitutes.data ? (
+          <div className="mt-4 flex min-h-16 flex-col items-center justify-center gap-2 text-center">
+            {substitutes.error ? (
+              <>
+                <p className="text-sm text-neutral-600">{substitutes.error.message}</p>
+                <button
+                  type="button"
+                  onClick={substitutes.reload}
+                  className="text-sm font-medium text-accent hover:underline"
+                >
+                  Tentar novamente
+                </button>
+              </>
+            ) : (
+              <Spinner className="h-6 w-6" />
+            )}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-neutral-600">
+            {hasOptions
+              ? "Escolha um substituto, com as mesmas calorias:"
+              : "Não há outros alimentos do mesmo grupo disponíveis, então ele sairá sem substituto."}
+          </p>
+        )}
 
         {hasOptions && (
           <fieldset className="mt-2 flex min-w-0 flex-col gap-2">
@@ -142,7 +169,7 @@ export function FoodFeedbackDialog({ open, foodName, mealTitle, options, onConfi
           </button>
           <button
             type="submit"
-            disabled={reason === null || (hasOptions && choice === null)}
+            disabled={reason === null || !substitutes.data || (hasOptions && choice === null) || submitting}
             className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Confirmar

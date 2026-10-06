@@ -17,6 +17,19 @@ export function formatLongDate(isoDate: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+const dateTime = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** "21/09/2026 às 22:14", no fuso do usuário. */
+export function formatDateTime(iso: string) {
+  return dateTime.format(new Date(iso)).replace(",", " às");
+}
+
 export function formatSigned(value: number) {
   return `${value > 0 ? "+" : value < 0 ? "−" : ""}${numberFormat.format(Math.abs(value))}`;
 }

@@ -12,20 +12,20 @@ import {
   type TooltipContentProps,
 } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
-import type { activityHistory } from "@/lib/mock-data";
+import type { ActivityDay } from "@/lib/api/types";
 import { formatLongDate, formatShortDate, formatSigned, numberFormat } from "@/components/history/format";
 
 const CONSUMED_COLOR = "#f4623a";
 const BURNED_COLOR = "#3b82c4";
 
 type BalanceChartProps = {
-  days: typeof activityHistory;
+  days: ActivityDay[];
   goal: number;
 };
 
 function BalanceTooltip({ active, payload, label }: TooltipContentProps<ValueType, NameType>) {
   if (!active || !payload?.length) return null;
-  const day = payload[0].payload as (typeof activityHistory)[number];
+  const day = payload[0].payload as ActivityDay;
   const balance = day.consumed - day.burned;
 
   return (

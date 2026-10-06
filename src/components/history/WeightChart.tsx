@@ -14,14 +14,17 @@ import {
 } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { Plus, Scale } from "lucide-react";
-import { addWeightEntry, useAuth, type WeightEntry } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import { useApiQuery } from "@/lib/api/query";
+import { addWeightEntry, WEIGHTS_PATH } from "@/lib/api/actions";
+import type { WeightEntry } from "@/lib/api/types";
+import { QueryStatus } from "@/components/api/QueryStatus";
 import { WeightDialog } from "@/components/history/WeightDialog";
-import { mockWeightHistory } from "@/lib/mock-data";
 
 const LINE_COLOR = "#8b5cf6";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Pesagens são registradas no fuso do usuário (diferente das datas fixas em UTC do mock).
+// Pesagens são mostradas no fuso do usuário (as datas "AAAA-MM-DD" dos outros gráficos usam UTC).
 const shortDate = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" });
 const dateTime = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const longDateTime = new Intl.DateTimeFormat("pt-BR", {
@@ -78,11 +81,15 @@ type WeightChartProps = {
 };
 
 export function WeightChart({ period }: WeightChartProps) {
+  const weights = useApiQuery<WeightEntry[]>(WEIGHTS_PATH);
+  if (!weights.data) return <QueryStatus title="Peso" error={weights.error} onRetry={weights.reload} />;
+  return <WeightChartCard period={period} entries={weights.data} />;
+}
+
+/** `entries` do mais antigo para o mais recente. */
+function WeightChartCard({ period, entries }: WeightChartProps & { entries: WeightEntry[] }) {
   const auth = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const realEntries: WeightEntry[] = auth?.weights ?? [];
-  // Antes do primeiro registro real entra um histórico simulado, como nos outros gráficos.
-  const entries = realEntries.length > 0 ? [...mockWeightHistory(realEntries[0]), ...realEntries] : [];
   const profileKg = auth?.profile?.weightKg;
 
   // O eixo termina no momento em que a página abriu, ou no último registro se ele for mais recente.
@@ -189,9 +196,8 @@ export function WeightChart({ period }: WeightChartProps) {
       <WeightDialog
         open={dialogOpen}
         lastKg={lastEntry?.kg}
-        onConfirm={(kg, at) => {
-          addWeightEntry(kg, at);
-          setDialogOpen(false);
+        onConfirm={async (kg, at) => {
+          if (await addWeightEntry(kg, at)) setDialogOpen(false);
         }}
         onCancel={() => setDialogOpen(false)}
       />

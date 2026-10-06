@@ -1,15 +1,19 @@
-const numberFormat = new Intl.NumberFormat("pt-BR");
-
 type ProgressBarProps = {
   label: string;
   atual: number;
   meta: number;
   unit: string;
+  /** Casas decimais fixas no texto (ex.: 1 para g/kg: "1,2/2,0 g/kg"). */
+  fractionDigits?: number;
   color?: string;
 };
 
-export function ProgressBar({ label, atual, meta, unit, color = "var(--accent)" }: ProgressBarProps) {
+export function ProgressBar({ label, atual, meta, unit, fractionDigits, color = "var(--accent)" }: ProgressBarProps) {
   const percent = Math.min(100, Math.round((atual / meta) * 100));
+  const numberFormat = new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  });
 
   return (
     <div className="flex flex-col gap-1.5">

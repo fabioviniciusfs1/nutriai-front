@@ -2,25 +2,23 @@
 
 import { useState } from "react";
 import { Scale } from "lucide-react";
-import { addWeightEntry, useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import { useApiQuery } from "@/lib/api/query";
+import { addWeightEntry, WEIGHTS_PATH } from "@/lib/api/actions";
+import type { WeightEntry } from "@/lib/api/types";
 import { WeightDialog } from "@/components/history/WeightDialog";
 
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+/** Aviso no dia da pesagem escolhido no perfil; o backend diz quando mostrar (`weighInDue`). */
+export function WeighInReminder() {
+  const due = useAuth()?.weighInDue ?? false;
+  if (!due) return null;
+  return <WeighInCard />;
 }
 
-/** Aviso no dia da pesagem escolhido no perfil; some quando há um peso registrado hoje. */
-export function WeighInReminder() {
-  const auth = useAuth();
+function WeighInCard() {
   const [dialogOpen, setDialogOpen] = useState(false);
-
-  const today = new Date();
-  const weights = auth?.weights ?? [];
-  const lastEntry = weights.at(-1);
-  const weighedToday = weights.some((entry) => isSameDay(new Date(entry.at), today));
-
-  // Perfis salvos antes do campo existir não têm `weighInDay`.
-  if (auth?.profile?.weighInDay !== today.getDay() || weighedToday) return null;
+  // Só para sugerir o último peso no campo.
+  const lastEntry = useApiQuery<WeightEntry[]>(WEIGHTS_PATH).data?.at(-1);
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-white p-5 shadow-sm">
@@ -42,9 +40,8 @@ export function WeighInReminder() {
       <WeightDialog
         open={dialogOpen}
         lastKg={lastEntry?.kg}
-        onConfirm={(kg, at) => {
-          addWeightEntry(kg, at);
-          setDialogOpen(false);
+        onConfirm={async (kg, at) => {
+          if (await addWeightEntry(kg, at)) setDialogOpen(false);
         }}
         onCancel={() => setDialogOpen(false)}
       />

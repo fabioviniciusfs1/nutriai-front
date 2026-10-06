@@ -1,18 +1,25 @@
+"use client";
+
 import { Check, ChevronDown, X } from "lucide-react";
-import { planHistory } from "@/lib/mock-data";
+import { useApiQuery } from "@/lib/api/query";
+import type { PlanHistoryDay } from "@/lib/api/types";
+import { QueryStatus } from "@/components/api/QueryStatus";
 import { FOOD_FEEDBACK } from "@/lib/food-feedback";
 import { formatLongDate, numberFormat } from "@/components/history/format";
 
 export function PlanHistory() {
+  const { data: planHistory, error, reload } = useApiQuery<PlanHistoryDay[]>("/history/plans");
+  if (!planHistory) return <QueryStatus title="Planos Anteriores" error={error} onRetry={reload} />;
+
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
       <h3 className="font-semibold text-neutral-900">Planos Anteriores</h3>
       <p className="mt-1 text-xs text-neutral-500">Toque em um dia para ver as refeições</p>
 
+      {planHistory.length === 0 && <p className="mt-4 text-sm text-neutral-400">Nenhum plano anterior ainda.</p>}
+
       <ul className="mt-4 flex flex-col gap-3">
         {planHistory.map((plan) => {
-          const followed = plan.meals.filter((meal) => meal.followed).length;
-          const plannedKcal = plan.meals.reduce((total, meal) => total + meal.kcal, 0);
 
           return (
             <li key={plan.date}>
@@ -22,9 +29,9 @@ export function PlanHistory() {
                     <span className="font-medium text-neutral-900">{formatLongDate(plan.date)}</span>
                     <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-neutral-500">
                       <span>
-                        {followed}/{plan.meals.length} refeições seguidas
+                        {plan.followedCount}/{plan.meals.length} refeições seguidas
                       </span>
-                      <span>{numberFormat.format(plannedKcal)} kcal planejadas</span>
+                      <span>{numberFormat.format(plan.plannedKcal)} kcal planejadas</span>
                       {plan.flaggedFoods.length > 0 && (
                         <span className="rounded-full bg-accent/10 px-2 py-0.5 font-medium text-accent">
                           {plan.flaggedFoods.length} {plan.flaggedFoods.length === 1 ? "alimento marcado" : "alimentos marcados"}
