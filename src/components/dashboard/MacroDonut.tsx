@@ -87,16 +87,29 @@ function MacroDonutCard({ nutrition }: { nutrition: NutritionToday }) {
         </div>
 
         <div className="flex w-full flex-1 flex-col gap-3">
-          {nutrition.macros.map((macro) => (
-            <ProgressBar
-              key={macro.id}
-              label={macro.name}
-              atual={macro.atual}
-              meta={macro.meta}
-              unit="g"
-              color={MACRO_COLORS[macro.id]}
-            />
-          ))}
+          {nutrition.macros.map((macro) =>
+            // Com perfil, em g por kg de peso (vem pronto do backend); sem perfil, em gramas.
+            macro.perKg ? (
+              <ProgressBar
+                key={macro.id}
+                label={macro.name}
+                atual={macro.perKg.atual}
+                meta={macro.perKg.meta}
+                unit=" g/kg"
+                fractionDigits={1}
+                color={MACRO_COLORS[macro.id]}
+              />
+            ) : (
+              <ProgressBar
+                key={macro.id}
+                label={macro.name}
+                atual={macro.atual}
+                meta={macro.meta}
+                unit="g"
+                color={MACRO_COLORS[macro.id]}
+              />
+            )
+          )}
 
           <div className="mt-1 flex items-center gap-2 border-t border-neutral-100 pt-3 text-sm">
             <GlassWater size={16} className="text-[#7fc1e8]" />

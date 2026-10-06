@@ -227,9 +227,17 @@ O plano de hoje com **todas** as mudanças do usuário aplicadas, ordenado por h
 
 - `totals` = soma dos alimentos já arredondados, como aparecem.
 - `extraId` ≠ `null`: alimento acrescentado pelo usuário (tem botão de remover).
-- `canCreateMeal`: há sugestões de refeição disponíveis (senão o botão "Nova refeição" fica desativado).
+- `canCreateMeal`: há sugestões de refeição disponíveis (com o assistente, sempre; senão o botão "Nova refeição" fica desativado).
 
 **Todas as rotas de alteração do plano abaixo respondem `200` com o `TodayPlan` atualizado.**
+
+**Plano inicial**, antes das mudanças do usuário:
+
+- Tem `profile.mealsPerDay` refeições: café, almoço e jantar sempre, mais um lanche da tarde (a partir de 4),
+  um da manhã (5) e uma ceia (6). Depois o usuário cria ou remove refeições à vontade.
+- As porções de todas as refeições são escaladas na mesma proporção para o total do dia ficar o mais perto
+  possível de `targets.calories`. Sem perfil, ficam as porções de referência. Se a meta mudar, o plano todo
+  acompanha (inclusive o que o usuário acrescentou).
 
 **Como o plano de hoje é montado** (o que o usuário muda fica guardado em duas camadas):
 
@@ -243,7 +251,8 @@ O plano de hoje com **todas** as mudanças do usuário aplicadas, ordenado por h
   mínimo 1).
 - Sempre que um fator sobe para compensar calorias, confira os valores **já arredondados**: se o total do dia
   passar do total anterior, reduza o fator aos poucos (×0,999) até caber. O dia nunca ganha calorias com uma
-  ação do usuário.
+  ação do usuário, exceto ao criar refeição com meta calórica (ver "Criar refeição"), que leva o dia de volta
+  para a meta.
 
 ### `PUT /plan/meals/{id}/time`
 
@@ -278,7 +287,13 @@ Corpo: `{ "time": "08:00" }`. Permanente.
 
 ```json
 {
-  "totals": { "carbs": 30, "protein": 18, "fat": 8, "kcal": 280 },
+  "suggestion": "Omelete de Queijo com Salada",
+  "foods": [
+    { "name": "Ovo, de galinha, inteiro, cozido/10minutos", "grams": 100, "carbs": 1, "protein": 13, "fat": 10, "kcal": 146 },
+    { "name": "Queijo, minas, frescal", "grams": 40, "carbs": 1, "protein": 7, "fat": 8, "kcal": 106 },
+    { "name": "Alface, crespa, crua", "grams": 40, "carbs": 1, "protein": 1, "fat": 0, "kcal": 4 }
+  ],
+  "totals": { "carbs": 3, "protein": 21, "fat": 18, "kcal": 256 },
   "reductionPercent": 17,
   "changes": [{ "mealId": 1, "title": "Torrada de Abacate", "time": "07:30", "before": 350, "after": 290 }],
   "dayKcal": 1160
@@ -287,12 +302,22 @@ Corpo: `{ "time": "08:00" }`. Permanente.
 
 `POST /plan/meals` com o mesmo corpo cria de fato (permanente).
 
-- Os alimentos vêm de uma sugestão do período do horário (manhã < 11:00, tarde < 17:00, noite), preferindo
-  uma que ainda não está no plano e sem alimentos restritos.
-- A porção da sugestão é reduzida para no máximo `calorias do dia ÷ (nº de refeições + 1)`.
-- Todas as outras refeições reduzem as porções pelo mesmo fator para o total do dia não mudar
-  (`reductionPercent` = quanto reduziram; `changes` = antes/depois de cada uma; `dayKcal` = total do dia).
-- Com o plano vazio, a sugestão entra com a porção original.
+- Os alimentos são escolhidos pelo assistente (Claude) entre os do catálogo, considerando o nome da refeição,
+  o horário, os alimentos restritos, as outras refeições do dia e quanto falta de cada macronutriente. O
+  backend valida os nomes e calcula porções e nutrientes pelo catálogo. `suggestion` é o nome que o
+  assistente deu e `foods` são os alimentos nas porções em que vão entrar. O `POST /plan/meals` com o mesmo
+  nome e horário usa a mesma sugestão da prévia (guardada por 15 minutos).
+- Sem o assistente (sem chave da API ou se ele falhar), os alimentos vêm de uma sugestão fixa do período do
+  horário (manhã < 11:00, tarde < 17:00, noite), preferindo uma que ainda não está no plano e sem alimentos
+  restritos.
+- **Com meta calórica** (usuário com perfil): depois de criar, o dia volta para a meta. A refeição nova fica
+  com `targets.calories ÷ (nº de refeições + 1)` e todas as outras ajustam as porções pelo mesmo fator para o
+  total ficar o mais perto possível da meta, sem passar dela. Com o plano vazio, a nova fica com a meta inteira.
+- **Sem meta:** a porção da sugestão é reduzida para no máximo `calorias do dia ÷ (nº de refeições + 1)` e as
+  outras reduzem as porções para o total do dia não mudar. Com o plano vazio, a sugestão entra com a porção
+  original.
+- `reductionPercent` = quanto as outras refeições diminuem (%); **negativo = aumentam** (o dia estava abaixo
+  da meta). `changes` = antes/depois de cada uma; `dayKcal` = total do dia depois de criar.
 
 ### Acrescentar alimento
 
@@ -373,9 +398,9 @@ alimento volta a poder ser sugerido e oferecido); **as trocas já feitas continu
   "consumedKcal": 1985,
   "burnedKcal": 2210,
   "macros": [
-    { "id": "proteinas", "name": "Proteínas", "atual": 145, "meta": 150, "unit": "g" },
-    { "id": "gorduras", "name": "Gorduras", "atual": 65, "meta": 70, "unit": "g" },
-    { "id": "carboidratos", "name": "Carboidratos", "atual": 220, "meta": 250, "unit": "g" }
+    { "id": "proteinas", "name": "Proteínas", "atual": 81, "meta": 137, "unit": "g", "perKg": { "atual": 1.2, "meta": 2 } },
+    { "id": "gorduras", "name": "Gorduras", "atual": 36, "meta": 69, "unit": "g", "perKg": { "atual": 0.5, "meta": 1 } },
+    { "id": "carboidratos", "name": "Carboidratos", "atual": 140, "meta": 124, "unit": "g", "perKg": { "atual": 2, "meta": 1.8 } }
   ],
   "fibers": [{ "id": "fibras", "name": "Fibras", "atual": 22, "meta": 30, "unit": "g" }],
   "otherMacros": [{ "id": "acucares", "name": "Açúcares", "atual": 38, "meta": 50, "unit": "g", "limit": true }],
@@ -388,6 +413,10 @@ alimento volta a poder ser sugerido e oferecido); **as trocas já feitas continu
 - `burnedKcal`: gasto de hoje do Google Fit / Apple Saúde; `null` sem dados.
 - `limit: true` quando `meta` é um máximo (açúcares, gordura saturada, colesterol, sódio).
 - `macros` precisa ter os ids `proteinas`, `gorduras` e `carboidratos` (o front usa para as cores).
+- Metas dos macros com perfil: proteína 2 g/kg e gordura 1 g/kg de peso; o carboidrato fica com o restante
+  da meta calórica (4/9/4 kcal por grama, nunca negativo). Sem perfil, metas padrão.
+- `perKg`: `atual` e `meta` divididos pelo peso do perfil (g/kg, uma casa decimal); `null` sem perfil. A barra
+  de progresso do card "Meta diária" mostra esses valores.
 
 ### `GET /nutrients/groups` → `NutrientGroup[]`
 

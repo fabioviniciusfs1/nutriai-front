@@ -9,11 +9,14 @@ export const TODAY_PLAN_PATH = "/plan/today";
 export const RESTRICTED_FOODS_PATH = "/foods/restricted";
 export const WEIGHTS_PATH = "/weights";
 
-/** Toda mudança no plano: o plano de hoje vem na resposta e as prévias por refeição ficam velhas. */
+/**
+ * Toda mudança no plano: o plano de hoje vem na resposta; as prévias por refeição, o consumo de hoje
+ * (`/nutrition/today`, card "Meta diária") e o histórico (que inclui hoje) ficam velhos.
+ */
 function planMutation(path: string, method: string, body?: unknown, alsoInvalidate: string[] = []) {
   return mutate<TodayPlan>(path, method, body, {
     update: TODAY_PLAN_PATH,
-    invalidate: ["/plan/meals/", ...alsoInvalidate],
+    invalidate: ["/plan/meals/", "/nutrition", "/history", ...alsoInvalidate],
   });
 }
 

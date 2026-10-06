@@ -76,16 +76,38 @@ export function CreateMealDialog({ open, onConfirm, onCancel }: CreateMealDialog
         <div className="p-5">
           <h4 className="font-semibold text-neutral-900">Criar &ldquo;{name.trim()}&rdquo;?</h4>
           <p className="mt-2 text-sm text-neutral-600">
-            O assistente vai sugerir uma refeição de <strong>{numberFormat.format(confirming.totals.kcal)} kcal</strong>{" "}
-            para as {time} ({confirming.totals.carbs}g carb. · {confirming.totals.protein}g prot. ·{" "}
-            {confirming.totals.fat}g gord.).
+            O assistente sugere <strong>{confirming.suggestion}</strong>, com{" "}
+            <strong>{numberFormat.format(confirming.totals.kcal)} kcal</strong> para as {time} (
+            {confirming.totals.carbs}g carb. · {confirming.totals.protein}g prot. · {confirming.totals.fat}g gord.):
           </p>
+          <ul className="mt-3 flex flex-col divide-y divide-neutral-100 rounded-xl border border-neutral-100">
+            {confirming.foods.map((food) => (
+              <li key={food.name} className="flex items-center gap-3 px-3 py-2 text-sm">
+                <span className="min-w-0 flex-1 text-neutral-800">{food.name}</span>
+                <span className="shrink-0 text-right tabular-nums text-neutral-500">
+                  {numberFormat.format(food.grams)} g · {numberFormat.format(food.kcal)} kcal
+                </span>
+              </li>
+            ))}
+          </ul>
 
           {confirming.changes.length > 0 ? (
             <>
               <p className="mt-3 text-sm text-neutral-600">
-                Para não passar da meta diária, esses nutrientes saem das outras refeições, que terão as porções
-                reduzidas em <strong>{confirming.reductionPercent}%</strong>:
+                {/* `reductionPercent` negativo = as outras refeições aumentam (o dia estava abaixo da meta). */}
+                {confirming.reductionPercent > 0 ? (
+                  <>
+                    Para não passar da meta diária, as outras refeições terão as porções reduzidas em{" "}
+                    <strong>{confirming.reductionPercent}%</strong>:
+                  </>
+                ) : confirming.reductionPercent < 0 ? (
+                  <>
+                    Para chegar perto da meta diária, as outras refeições terão as porções aumentadas em{" "}
+                    <strong>{Math.abs(confirming.reductionPercent)}%</strong>:
+                  </>
+                ) : (
+                  <>As outras refeições ficam como estão:</>
+                )}
               </p>
               <ul className="mt-3 flex flex-col divide-y divide-neutral-100 rounded-xl border border-neutral-100">
                 {confirming.changes.map((change) => (
@@ -99,7 +121,7 @@ export function CreateMealDialog({ open, onConfirm, onCancel }: CreateMealDialog
                 ))}
               </ul>
               <p className="mt-2 text-xs text-neutral-500">
-                O total do dia continua em cerca de {numberFormat.format(confirming.dayKcal)} kcal. A refeição fica no plano até
+                O total do dia fica em cerca de {numberFormat.format(confirming.dayKcal)} kcal. A refeição fica no plano até
                 você removê-la.
               </p>
             </>
@@ -195,7 +217,7 @@ export function CreateMealDialog({ open, onConfirm, onCancel }: CreateMealDialog
               disabled={busy}
               className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
             >
-              {busy ? "Calculando…" : "Continuar"}
+              {busy ? "Montando a refeição…" : "Continuar"}
             </button>
           </div>
         </form>

@@ -85,6 +85,10 @@ export type RemovalOptions = {
 };
 
 export type CreateMealPreview = {
+  /** Nome da refeição que o assistente sugere (ex.: "Omelete com Salada"); a refeição fica com o nome do usuário. */
+  suggestion: string;
+  /** Alimentos sugeridos, nas porções em que vão entrar no plano. */
+  foods: PlanFood[];
   /** Totais da refeição que o assistente vai sugerir. */
   totals: Totals;
   /** Quanto as porções das outras refeições diminuem (%). */
@@ -131,12 +135,19 @@ export type Nutrient = {
 
 export type MacroId = "proteinas" | "gorduras" | "carboidratos";
 
+/** Macronutriente do dia, também em g por kg de peso corporal (as metas são 2 g/kg de proteína e 1 g/kg de gordura). */
+export type MacroNutrient = Nutrient & {
+  id: MacroId;
+  /** `atual` e `meta` em g/kg de peso, com uma casa decimal; `null` sem perfil. */
+  perKg: { atual: number; meta: number } | null;
+};
+
 export type NutritionToday = {
   consumedKcal: number;
   /** Calorias gastas hoje (Google Fit / Apple Saúde); `null` sem dados. */
   burnedKcal: number | null;
-  /** Em gramas. */
-  macros: (Nutrient & { id: MacroId })[];
+  /** Em gramas (e em g/kg em `perKg`). */
+  macros: MacroNutrient[];
   fibers: Nutrient[];
   /** Açúcares, gordura saturada, colesterol… */
   otherMacros: Nutrient[];
