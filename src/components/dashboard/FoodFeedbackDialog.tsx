@@ -118,7 +118,7 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
           <p className="mt-4 text-sm text-neutral-600">
             {hasOptions
               ? "Escolha um substituto, com as mesmas calorias:"
-              : "Não há outros alimentos do mesmo grupo disponíveis, então ele sairá sem substituto."}
+              : "Não encontramos substitutos para este alimento, então ele sairá sem substituto."}
           </p>
         )}
 
