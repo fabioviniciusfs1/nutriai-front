@@ -5,7 +5,16 @@ import { useRouter } from "next/navigation";
 import { saveProfile, useAuth } from "@/lib/auth";
 import { ApiError, apiFetch } from "@/lib/api/client";
 import type { Targets } from "@/lib/api/types";
-import { ACTIVITY_LEVELS, GOALS, MEALS_PER_DAY, SEXES, WEEKDAYS, type Profile } from "@/lib/profile";
+import {
+  ACTIVITY_LEVELS,
+  DIETS,
+  GOALS,
+  MEALS_PER_DAY,
+  PREFERENCES_MAX,
+  SEXES,
+  WEEKDAYS,
+  type Profile,
+} from "@/lib/profile";
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
 
@@ -92,6 +101,8 @@ export function ProfileForm() {
   const [goal, setGoal] = useState<Profile["goal"] | null>(saved?.goal ?? null);
   const [mealsPerDay, setMealsPerDay] = useState<Profile["mealsPerDay"] | null>(saved?.mealsPerDay ?? null);
   const [weighInDay, setWeighInDay] = useState<Profile["weighInDay"] | null>(saved?.weighInDay ?? null);
+  const [diet, setDiet] = useState<Profile["diet"] | null>(saved?.diet ?? null);
+  const [preferences, setPreferences] = useState(saved?.preferences ?? "");
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -114,6 +125,7 @@ export function ProfileForm() {
     goal &&
     mealsPerDay !== null &&
     weighInDay !== null &&
+    diet !== null &&
     Object.values(numberErrors).every((error) => error === null)
       ? {
           sex,
@@ -124,6 +136,8 @@ export function ProfileForm() {
           goal,
           mealsPerDay,
           weighInDay,
+          diet,
+          preferences: preferences.trim(),
         }
       : null;
 
@@ -282,6 +296,49 @@ export function ProfileForm() {
             </div>
             {showErrors && weighInDay === null && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
           </fieldset>
+        </section>
+
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h3 className="font-semibold text-neutral-900">Preferências alimentares</h3>
+          {!saved && (
+            <p className="mt-1 text-xs text-neutral-500">
+              Com essas informações, o assistente monta um plano alimentar feito para você.
+            </p>
+          )}
+
+          <fieldset className="mt-4" data-invalid={showErrors && diet === null ? true : undefined}>
+            <legend className="text-sm font-medium text-neutral-700">Tipo de alimentação</legend>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {DIETS.map((item) => (
+                <OptionCard
+                  key={item.id}
+                  name="diet"
+                  label={item.label}
+                  description={item.description}
+                  checked={diet === item.id}
+                  onChange={() => setDiet(item.id)}
+                />
+              ))}
+            </div>
+            {showErrors && diet === null && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
+          </fieldset>
+
+          <label className="mt-4 block">
+            <span className="text-sm font-medium text-neutral-700">Gostos e rotina (opcional)</span>
+            <span className="block text-xs text-neutral-500">
+              Ex.: não gosto de peixe, intolerância a lactose, almoço de marmita, treino às 18h.
+            </span>
+            <textarea
+              value={preferences}
+              onChange={(event) => setPreferences(event.target.value)}
+              maxLength={PREFERENCES_MAX}
+              rows={3}
+              className="mt-2 w-full resize-none rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900 outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20"
+            />
+            <span className="block text-right text-xs text-neutral-400">
+              {preferences.length}/{PREFERENCES_MAX}
+            </span>
+          </label>
         </section>
       </div>
 

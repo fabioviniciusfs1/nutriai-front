@@ -32,6 +32,11 @@ export function createMeal(title: string, time: string) {
   return planMutation("/plan/meals", "POST", { title, time });
 }
 
+/** Tenta de novo montar o plano individual (depois de uma falha); a montagem segue em segundo plano. */
+export function personalizePlan() {
+  return planMutation("/plan/personalize", "POST");
+}
+
 export function addFood(mealId: number, foodName: string) {
   return planMutation(`/plan/meals/${mealId}/foods`, "POST", { foodName });
 }

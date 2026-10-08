@@ -66,8 +66,16 @@ export type PlanMeal = {
 };
 
 /** Plano de hoje já com todas as mudanças do usuário, ordenado por horário. */
+/**
+ * Plano individual montado pelo assistente na primeira vez que o perfil é salvo: `pending` enquanto monta
+ * (o plano padrão aparece por baixo), `failed` se não deu certo (`POST /plan/personalize` tenta de novo),
+ * `ready` quando aplicado e `null` se nunca foi pedido.
+ */
+export type Personalization = "pending" | "ready" | "failed" | null;
+
 export type TodayPlan = {
   meals: PlanMeal[];
+  personalization: Personalization;
   /** Se o assistente tem sugestões para uma refeição nova. */
   canCreateMeal: boolean;
 };

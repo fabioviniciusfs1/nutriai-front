@@ -3,7 +3,8 @@
 import { MoreHorizontal, GlassWater, Flame } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useApiQuery } from "@/lib/api/query";
-import type { NutritionToday } from "@/lib/api/types";
+import type { NutritionToday, TodayPlan } from "@/lib/api/types";
+import { TODAY_PLAN_PATH } from "@/lib/api/actions";
 import { MACRO_COLORS } from "@/lib/nutrients";
 import { QueryStatus } from "@/components/api/QueryStatus";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
@@ -15,7 +16,10 @@ const numberFormat = new Intl.NumberFormat("pt-BR");
 
 export function MacroDonut() {
   const nutrition = useApiQuery<NutritionToday>("/nutrition/today");
-  if (!nutrition.data) return <QueryStatus title="Meta diária" error={nutrition.error} onRetry={nutrition.reload} />;
+  // Enquanto o assistente monta o plano individual, o consumo de hoje ainda é o do plano padrão: espera.
+  const personalizing = useApiQuery<TodayPlan>(TODAY_PLAN_PATH).data?.personalization === "pending";
+  if (!nutrition.data || personalizing)
+    return <QueryStatus title="Meta diária" error={nutrition.error} onRetry={nutrition.reload} />;
   return <MacroDonutCard nutrition={nutrition.data} />;
 }
 

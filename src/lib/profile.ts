@@ -20,6 +20,17 @@ export const GOALS = [
 
 export const MEALS_PER_DAY = [3, 4, 5, 6] as const;
 
+/** Tipo de alimentação: o backend tira do plano e das sugestões o que a dieta exclui. */
+export const DIETS = [
+  { id: "onivora", label: "Sem restrição", description: "Como de tudo" },
+  { id: "pescetariana", label: "Pescetariana", description: "Sem carnes; com peixes, ovos e laticínios" },
+  { id: "vegetariana", label: "Vegetariana", description: "Sem carnes e peixes; com ovos e laticínios" },
+  { id: "vegana", label: "Vegana", description: "Nada de origem animal" },
+] as const;
+
+/** Tamanho máximo do texto de preferências. */
+export const PREFERENCES_MAX = 500;
+
 /** `id` segue `Date.getDay()` (0 = domingo); a lista começa na segunda. */
 export const WEEKDAYS = [
   { id: 1, label: "Segunda" },
@@ -42,4 +53,7 @@ export type Profile = {
   mealsPerDay: (typeof MEALS_PER_DAY)[number];
   /** Dia da semana em que o app lembra de registrar o peso. */
   weighInDay: (typeof WEEKDAYS)[number]["id"];
+  diet: (typeof DIETS)[number]["id"];
+  /** Gostos, rotina, intolerâncias… em texto livre (pode ser vazio). Vai para o assistente. */
+  preferences: string;
 };

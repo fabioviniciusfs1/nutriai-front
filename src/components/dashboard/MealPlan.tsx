@@ -1,20 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeftRight, Clock, Flame, Wheat, Drumstick, Droplet, Plus, PlusCircle, Trash2 } from "lucide-react";
 import type { FoodFeedback } from "@/lib/food-feedback";
 import type { RemoveMealOption, TodayPlan } from "@/lib/api/types";
-import { useApiQuery } from "@/lib/api/query";
+import { invalidate, useApiQuery } from "@/lib/api/query";
 import {
   addFood,
   changeMealTime,
   createMeal,
+  personalizePlan,
   removeExtraFood,
   removeMeal,
   swapFood,
   TODAY_PLAN_PATH,
 } from "@/lib/api/actions";
-import { QueryStatus } from "@/components/api/QueryStatus";
+import { QueryStatus, Spinner } from "@/components/api/QueryStatus";
 import { FoodFeedbackDialog } from "@/components/dashboard/FoodFeedbackDialog";
 import { TimePickerDialog } from "@/components/dashboard/TimePickerDialog";
 import { RemoveMealDialog } from "@/components/dashboard/RemoveMealDialog";
@@ -27,8 +28,60 @@ import { AddFoodDialog } from "@/components/dashboard/AddFoodDialog";
  */
 export function MealPlan() {
   const { data: plan, error, reload } = useApiQuery<TodayPlan>(TODAY_PLAN_PATH);
+  const personalizing = plan?.personalization === "pending";
+
+  // Enquanto o assistente monta o plano individual, pergunta de novo a cada poucos segundos (o consumo de
+  // hoje acompanha o plano).
+  useEffect(() => {
+    if (!personalizing) return;
+    const timer = setInterval(() => invalidate(TODAY_PLAN_PATH, "/nutrition"), PERSONALIZATION_POLL_MS);
+    return () => clearInterval(timer);
+  }, [personalizing]);
+
   if (!plan) return <QueryStatus title="Plano Alimentar" error={error} onRetry={reload} />;
+  if (personalizing) return <PersonalizingCard />;
   return <MealPlanView plan={plan} />;
+}
+
+const PERSONALIZATION_POLL_MS = 3000;
+
+/** No lugar do plano enquanto o assistente monta o plano individual. */
+function PersonalizingCard() {
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm">
+      <h3 className="font-semibold text-neutral-900">Plano Alimentar</h3>
+      <div className="flex min-h-32 flex-col items-center justify-center gap-3 text-center">
+        <Spinner />
+        <p className="font-medium text-neutral-900">Montando seu plano personalizado…</p>
+        <p className="max-w-sm text-sm text-neutral-500">
+          O assistente está escolhendo as refeições a partir do seu perfil. Isso leva alguns segundos.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Aviso se a montagem do plano individual falhou (fica o plano padrão). */
+function PersonalizationNotice({ personalization }: { personalization: TodayPlan["personalization"] }) {
+  const [retrying, setRetrying] = useState(false);
+  if (personalization !== "failed") return null;
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+      <p>Não conseguimos montar seu plano personalizado. Este é o plano padrão.</p>
+      <button
+        type="button"
+        disabled={retrying}
+        onClick={async () => {
+          setRetrying(true);
+          await personalizePlan();
+          setRetrying(false);
+        }}
+        className="font-medium underline-offset-2 hover:underline disabled:opacity-50"
+      >
+        Tentar de novo
+      </button>
+    </div>
+  );
 }
 
 function MealPlanView({ plan }: { plan: TodayPlan }) {
@@ -106,6 +159,8 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
           </button>
         ))}
       </div>
+
+      <PersonalizationNotice personalization={plan.personalization} />
 
       {plan.meals.length === 0 && (
         <p className="mt-4 text-sm text-neutral-400">Nenhuma refeição no plano de hoje.</p>
