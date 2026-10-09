@@ -28,9 +28,6 @@ export const DIETS = [
   { id: "vegana", label: "Vegana", description: "Nada de origem animal" },
 ] as const;
 
-/** Tamanho máximo do texto de preferências. */
-export const PREFERENCES_MAX = 500;
-
 /** `id` segue `Date.getDay()` (0 = domingo); a lista começa na segunda. */
 export const WEEKDAYS = [
   { id: 1, label: "Segunda" },
@@ -54,6 +51,4 @@ export type Profile = {
   /** Dia da semana em que o app lembra de registrar o peso. */
   weighInDay: (typeof WEEKDAYS)[number]["id"];
   diet: (typeof DIETS)[number]["id"];
-  /** Gostos, rotina, intolerâncias… em texto livre (pode ser vazio). Vai para o assistente. */
-  preferences: string;
 };

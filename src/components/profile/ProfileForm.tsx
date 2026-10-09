@@ -10,7 +10,6 @@ import {
   DIETS,
   GOALS,
   MEALS_PER_DAY,
-  PREFERENCES_MAX,
   SEXES,
   WEEKDAYS,
   type Profile,
@@ -102,7 +101,6 @@ export function ProfileForm() {
   const [mealsPerDay, setMealsPerDay] = useState<Profile["mealsPerDay"] | null>(saved?.mealsPerDay ?? null);
   const [weighInDay, setWeighInDay] = useState<Profile["weighInDay"] | null>(saved?.weighInDay ?? null);
   const [diet, setDiet] = useState<Profile["diet"] | null>(saved?.diet ?? null);
-  const [preferences, setPreferences] = useState(saved?.preferences ?? "");
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -137,7 +135,6 @@ export function ProfileForm() {
           mealsPerDay,
           weighInDay,
           diet,
-          preferences: preferences.trim(),
         }
       : null;
 
@@ -322,23 +319,6 @@ export function ProfileForm() {
             </div>
             {showErrors && diet === null && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
           </fieldset>
-
-          <label className="mt-4 block">
-            <span className="text-sm font-medium text-neutral-700">Gostos e rotina (opcional)</span>
-            <span className="block text-xs text-neutral-500">
-              Ex.: não gosto de peixe, intolerância a lactose, almoço de marmita, treino às 18h.
-            </span>
-            <textarea
-              value={preferences}
-              onChange={(event) => setPreferences(event.target.value)}
-              maxLength={PREFERENCES_MAX}
-              rows={3}
-              className="mt-2 w-full resize-none rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900 outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20"
-            />
-            <span className="block text-right text-xs text-neutral-400">
-              {preferences.length}/{PREFERENCES_MAX}
-            </span>
-          </label>
         </section>
       </div>
 
