@@ -13,6 +13,8 @@ COPY . .
 # NEXT_PUBLIC_* é embutido no bundle durante o build (os .env* não entram na imagem).
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_CHAT_ENABLED=true
+ENV NEXT_PUBLIC_CHAT_ENABLED=$NEXT_PUBLIC_CHAT_ENABLED
 RUN npm run build
 
 FROM base AS runner

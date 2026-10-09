@@ -5,13 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogOut, Menu, X } from "lucide-react";
 import { getInitials, signOut, useAuth } from "@/lib/auth";
+import { CHAT_ENABLED } from "@/lib/features";
 
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "Início", href: "/" },
   { label: "Nutrientes", href: "/nutrientes" },
   { label: "Alimentos", href: "/alimentos" },
   { label: "Histórico", href: "/historico" },
-  { label: "Chat com IA", href: "/chat" },
+  ...(CHAT_ENABLED ? [{ label: "Chat com IA", href: "/chat" }] : []),
 ];
 
 export function Topbar() {

@@ -21,6 +21,7 @@ There is no test suite configured in this repo.
 ## Docker
 
 - `NEXT_PUBLIC_API_URL` is inlined at build time, so the `Dockerfile` takes it as a build arg and `docker-compose.yml` requires it (from the shell or a `.env` next to it — `.env*` files are excluded from the build context).
+- `NEXT_PUBLIC_CHAT_ENABLED=false` (also inlined at build time; build arg with default `true`) hides the "Chat com IA" menu item and makes `/chat` a 404 (`src/lib/features.ts`); the backend has the matching `CHAT_ENABLED`.
 - `docker compose up -d --build` builds and runs the production image on port 3000.
 - The `Dockerfile` is a 3-stage build (`deps` → `builder` → `runner`) relying on `output: "standalone"` in `next.config.ts` (the default when `NEXT_OUTPUT` is not `export`); the runner stage only copies `.next/standalone`, `.next/static`, and `public`, and runs as a non-root `nextjs` user. If you add a dependency that needs native/runtime files not covered by the standalone trace, the Docker image will be missing them even though `next dev`/`next build` work fine locally.
 
