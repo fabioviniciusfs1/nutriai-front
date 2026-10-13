@@ -11,6 +11,7 @@ import {
   WEEKDAYS,
   type MealSlot,
   type BusyTimes,
+  type DayPeriod,
   type Routine,
   hoursOfWindows,
   unavailableHours,
@@ -25,6 +26,13 @@ const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 const hourText = (hour: number) => `${String(hour % 24).padStart(2, "0")}:00`;
 
+/** Horários de sono e treino do formulário; os de treino ficam guardados mesmo com "Não treino" marcado. */
+type FormTimes = { wakeTime: string; sleepTime: string; trainingStart: string; trainingEnd: string };
+
+/** O que tira horas da grade: o treino só conta para quem treina. */
+const busyTimes = (times: FormTimes, trains: boolean | null): BusyTimes =>
+  trains ? times : { ...times, trainingStart: null, trainingEnd: null };
+
 const withoutBusy = (hours: number[], times: BusyTimes) => {
   const busy = unavailableHours(times);
   return hours.filter((hour) => !busy.includes(hour));
@@ -34,6 +42,11 @@ const withoutBusy = (hours: number[], times: BusyTimes) => {
 function oneHourLater(time: string) {
   return `${String((Number(time.slice(0, 2)) + 1) % 24).padStart(2, "0")}:${time.slice(3)}`;
 }
+
+/** Resposta às perguntas de fome: um período do dia ou "Não sinto". */
+type HungerAnswer = DayPeriod | "nenhum";
+
+const HUNGER_OPTIONS: { id: HungerAnswer; label: string }[] = [...DAY_PERIODS, { id: "nenhum", label: "Não sinto" }];
 
 type Picking = { title: string; value: string; onConfirm: (value: string) => void };
 
@@ -55,21 +68,23 @@ export function RoutineForm() {
   const router = useRouter();
   const saved = auth?.routine;
 
-  const [times, setTimes] = useState<BusyTimes>({
+  // `null` enquanto a pessoa não disse se treina.
+  const [trains, setTrains] = useState<boolean | null>(saved ? saved.trainingStart !== null : null);
+  const [times, setTimes] = useState<FormTimes>({
     wakeTime: saved?.wakeTime ?? "07:00",
     sleepTime: saved?.sleepTime ?? "23:00",
-    // Rotina antiga salva como "não treino": começa no padrão e a pessoa informa o horário.
     trainingStart: saved?.trainingStart ?? "18:00",
     trainingEnd: saved?.trainingEnd ?? "19:00",
   });
   // Horas marcadas (0 a 23), sempre fora do sono e do treino; no cadastro, nenhuma.
   const [hours, setHours] = useState<number[]>(() =>
-    saved ? withoutBusy(hoursOfWindows(saved.eatingWindows), times) : []
+    saved ? withoutBusy(hoursOfWindows(saved.eatingWindows), busyTimes(times, trains)) : []
   );
   const [meals, setMeals] = useState<MealSlot[]>(saved?.meals ?? []);
-  const [hungriest, setHungriest] = useState<Routine["hungriestPeriod"] | null>(saved?.hungriestPeriod ?? null);
-  const [leastHungry, setLeastHungry] = useState<Routine["leastHungryPeriod"] | null>(
-    saved?.leastHungryPeriod ?? null
+  // `null` = ainda sem resposta (só no cadastro); "nenhum" = "Não sinto", salvo como `null`.
+  const [hungriest, setHungriest] = useState<HungerAnswer | null>(saved ? (saved.hungriestPeriod ?? "nenhum") : null);
+  const [leastHungry, setLeastHungry] = useState<HungerAnswer | null>(
+    saved ? (saved.leastHungryPeriod ?? "nenhum") : null
   );
   const [weighInDay, setWeighInDay] = useState<Routine["weighInDay"] | null>(saved?.weighInDay ?? null);
   const [diet, setDiet] = useState<Routine["diet"] | null>(saved?.diet ?? null);
@@ -78,12 +93,13 @@ export function RoutineForm() {
   const [saving, setSaving] = useState(false);
   const [askingRebuild, setAskingRebuild] = useState(false);
 
-  const busyHours = unavailableHours(times);
-  const sameTraining = times.trainingStart === times.trainingEnd;
-  const samePeriod = hungriest !== null && hungriest === leastHungry;
+  const busyHours = unavailableHours(busyTimes(times, trains));
+  const sameTraining = trains === true && times.trainingStart === times.trainingEnd;
+  const samePeriod = hungriest !== null && hungriest !== "nenhum" && hungriest === leastHungry;
 
   const routine: Routine | null =
     hours.length > 0 &&
+    trains !== null &&
     !sameTraining &&
     meals.length > 0 &&
     hungriest !== null &&
@@ -93,11 +109,11 @@ export function RoutineForm() {
     diet !== null
       ? {
           eatingWindows: windowsOfHours(hours),
-          ...times,
+          ...busyTimes(times, trains),
           // Na ordem do dia, não na que foram marcadas.
           meals: MEAL_SLOTS.map((slot) => slot.id).filter((id) => meals.includes(id)),
-          hungriestPeriod: hungriest,
-          leastHungryPeriod: leastHungry,
+          hungriestPeriod: hungriest === "nenhum" ? null : hungriest,
+          leastHungryPeriod: leastHungry === "nenhum" ? null : leastHungry,
           weighInDay,
           diet,
         }
@@ -108,10 +124,11 @@ export function RoutineForm() {
   }
 
   /** Muda sono ou treino e desmarca as horas para comer que deixaram de valer. */
-  function changeTimes(change: Partial<BusyTimes>) {
+  function changeTimes(change: Partial<FormTimes>, nextTrains = trains) {
     const next = { ...times, ...change };
     setTimes(next);
-    setHours((current) => withoutBusy(current, next));
+    setTrains(nextTrains);
+    setHours((current) => withoutBusy(current, busyTimes(next, nextTrains)));
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -172,32 +189,52 @@ export function RoutineForm() {
               </div>
             </div>
 
-            <fieldset className="mt-4" data-invalid={showErrors && sameTraining ? true : undefined}>
+            <fieldset
+              className="mt-4"
+              data-invalid={showErrors && (trains === null || sameTraining) ? true : undefined}
+            >
               <legend className="text-sm font-medium text-neutral-700">Treino</legend>
-              <div className="mt-2 grid grid-cols-2 gap-4">
-                <div className="flex flex-col items-start gap-1.5">
-                  <span className="text-sm text-neutral-500">Começa às</span>
-                  <TimeButton
-                    label="Treino começa às"
-                    value={times.trainingStart}
-                    onClick={() =>
-                      pick("Início do treino", times.trainingStart, (trainingStart) =>
-                        changeTimes({ trainingStart, trainingEnd: oneHourLater(trainingStart) })
-                      )
-                    }
-                  />
-                </div>
-                <div className="flex flex-col items-start gap-1.5">
-                  <span className="text-sm text-neutral-500">Termina às</span>
-                  <TimeButton
-                    label="Treino termina às"
-                    value={times.trainingEnd}
-                    onClick={() =>
-                      pick("Fim do treino", times.trainingEnd, (trainingEnd) => changeTimes({ trainingEnd }))
-                    }
-                  />
-                </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <OptionCard
+                  name="trains"
+                  label="Treino"
+                  checked={trains === true}
+                  onChange={() => changeTimes({}, true)}
+                />
+                <OptionCard
+                  name="trains"
+                  label="Não treino"
+                  checked={trains === false}
+                  onChange={() => changeTimes({}, false)}
+                />
               </div>
+              {required(trains === null)}
+              {trains && (
+                <div className="mt-2 grid grid-cols-2 gap-4">
+                  <div className="flex flex-col items-start gap-1.5">
+                    <span className="text-sm text-neutral-500">Começa às</span>
+                    <TimeButton
+                      label="Treino começa às"
+                      value={times.trainingStart}
+                      onClick={() =>
+                        pick("Início do treino", times.trainingStart, (trainingStart) =>
+                          changeTimes({ trainingStart, trainingEnd: oneHourLater(trainingStart) })
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col items-start gap-1.5">
+                    <span className="text-sm text-neutral-500">Termina às</span>
+                    <TimeButton
+                      label="Treino termina às"
+                      value={times.trainingEnd}
+                      onClick={() =>
+                        pick("Fim do treino", times.trainingEnd, (trainingEnd) => changeTimes({ trainingEnd }))
+                      }
+                    />
+                  </div>
+                </div>
+              )}
               {showErrors && sameTraining && (
                 <p className="mt-1 text-xs text-red-600">O treino deve terminar depois de começar</p>
               )}
@@ -266,8 +303,8 @@ export function RoutineForm() {
 
             <fieldset className="mt-4" data-invalid={showErrors && hungriest === null ? true : undefined}>
               <legend className="text-sm font-medium text-neutral-700">Período em que sinto mais fome</legend>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {DAY_PERIODS.map((period) => (
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {HUNGER_OPTIONS.map((period) => (
                   <OptionCard
                     key={period.id}
                     name="hungriestPeriod"
@@ -285,8 +322,8 @@ export function RoutineForm() {
               data-invalid={showErrors && (leastHungry === null || samePeriod) ? true : undefined}
             >
               <legend className="text-sm font-medium text-neutral-700">Período em que sinto menos fome</legend>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {DAY_PERIODS.map((period) => (
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {HUNGER_OPTIONS.map((period) => (
                   <OptionCard
                     key={period.id}
                     name="leastHungryPeriod"

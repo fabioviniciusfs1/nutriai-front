@@ -80,7 +80,13 @@ export function hoursOfWindows(windows: EatingWindow[]): number[] {
 }
 
 /** Horários da rotina que tiram horas da grade de horários para comer. */
-export type BusyTimes = { wakeTime: string; sleepTime: string; trainingStart: string; trainingEnd: string };
+export type BusyTimes = {
+  wakeTime: string;
+  sleepTime: string;
+  /** `null` (os dois) = não treina. */
+  trainingStart: string | null;
+  trainingEnd: string | null;
+};
 
 /**
  * Horas do dia (0 a 23) em que não dá para comer: a pessoa está dormindo (de `sleepTime` até `wakeTime`) ou
@@ -93,7 +99,9 @@ export function unavailableHours({ wakeTime, sleepTime, trainingStart, trainingE
     return a < b ? within(a, b) : a > b && (within(a, 1440) || within(0, b));
   };
   return Array.from({ length: 24 }, (_, hour) => hour).filter(
-    (hour) => busy(hour, sleepTime, wakeTime) || busy(hour, trainingStart, trainingEnd)
+    (hour) =>
+      busy(hour, sleepTime, wakeTime) ||
+      (trainingStart !== null && trainingEnd !== null && busy(hour, trainingStart, trainingEnd))
   );
 }
 
@@ -121,16 +129,16 @@ export type Routine = {
   wakeTime: string;
   /** "HH:MM"; pode ser antes de `wakeTime` (dorme depois da meia-noite). */
   sleepTime: string;
-  /** "HH:MM"; `null` só em rotinas antigas salvas como "não treino" (o `PUT` exige os dois horários do treino). */
+  /** "HH:MM"; `null` = não treina (os dois horários do treino vêm juntos: ambos preenchidos ou ambos `null`). */
   trainingStart: string | null;
   /** "HH:MM"; pode ser antes de `trainingStart` (treino que passa da meia-noite). */
   trainingEnd: string | null;
   /** Refeições que a pessoa faz no dia: pelo menos uma, sem repetir, na ordem do dia. */
   meals: MealSlot[];
-  /** Período do dia em que sente mais fome. */
-  hungriestPeriod: DayPeriod;
-  /** Período do dia em que sente menos fome (diferente de `hungriestPeriod`). */
-  leastHungryPeriod: DayPeriod;
+  /** Período do dia em que sente mais fome; `null` = não sente mais fome em nenhum ("Não sinto"). */
+  hungriestPeriod: DayPeriod | null;
+  /** Período do dia em que sente menos fome (diferente de `hungriestPeriod`); `null` = "Não sinto". */
+  leastHungryPeriod: DayPeriod | null;
   /** Dia da semana em que o app lembra de registrar o peso. */
   weighInDay: (typeof WEEKDAYS)[number]["id"];
   diet: (typeof DIETS)[number]["id"];
