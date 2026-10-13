@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, GlassWater, Flame } from "lucide-react";
+import { GlassWater, Flame } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useApiQuery } from "@/lib/api/query";
 import type { NutritionToday, TodayPlan } from "@/lib/api/types";
@@ -35,16 +35,7 @@ function MacroDonutCard({ nutrition }: { nutrition: NutritionToday }) {
 
   return (
     <div className="flex h-full flex-col rounded-2xl bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-neutral-900">Meta diária: {calorieGoal}</h3>
-        <button
-          type="button"
-          aria-label="Mais opções"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100"
-        >
-          <MoreHorizontal size={18} />
-        </button>
-      </div>
+      <h3 className="font-semibold text-neutral-900">Meta diária: {calorieGoal}</h3>
 
       <div className="mt-4 flex flex-1 flex-col items-center gap-6 sm:flex-row sm:gap-10">
         <div className="flex w-56 shrink-0 flex-col items-center sm:w-64">

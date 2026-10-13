@@ -19,3 +19,11 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+/* O Tailwind 4 deixa os botões com o cursor padrão; aqui todo botão ativo mostra a mãozinha de item clicável. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
