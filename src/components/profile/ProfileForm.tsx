@@ -5,15 +5,8 @@ import { useRouter } from "next/navigation";
 import { saveProfile, useAuth } from "@/lib/auth";
 import { ApiError, apiFetch } from "@/lib/api/client";
 import type { Targets } from "@/lib/api/types";
-import {
-  ACTIVITY_LEVELS,
-  DIETS,
-  GOALS,
-  MEALS_PER_DAY,
-  SEXES,
-  WEEKDAYS,
-  type Profile,
-} from "@/lib/profile";
+import { ACTIVITY_LEVELS, GOALS, SEXES, type Profile } from "@/lib/profile";
+import { OptionCard } from "@/components/profile/OptionCard";
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
 
@@ -57,38 +50,11 @@ function useEstimate(profile: Profile | null) {
   return result?.key === key ? result : undefined;
 }
 
-function OptionCard({
-  name,
-  checked,
-  label,
-  description,
-  onChange,
-}: {
-  name: string;
-  checked: boolean;
-  label: string;
-  description?: string;
-  onChange: () => void;
-}) {
-  return (
-    <label
-      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
-        checked ? "border-accent bg-accent/5" : "border-neutral-200 hover:border-neutral-300"
-      }`}
-    >
-      <input type="radio" name={name} checked={checked} onChange={onChange} className="mt-0.5 accent-accent" />
-      <span className="flex flex-col">
-        <span className="text-sm font-medium text-neutral-900">{label}</span>
-        {description && <span className="text-xs text-neutral-500">{description}</span>}
-      </span>
-    </label>
-  );
-}
-
 export function ProfileForm() {
   const auth = useAuth();
   const router = useRouter();
   const saved = auth?.profile;
+  const onboarding = !auth?.routine;
 
   const [sex, setSex] = useState<Profile["sex"] | null>(saved?.sex ?? null);
   const [numbers, setNumbers] = useState<Record<NumericKey, string>>({
@@ -98,9 +64,6 @@ export function ProfileForm() {
   });
   const [activityLevel, setActivityLevel] = useState<Profile["activityLevel"] | null>(saved?.activityLevel ?? null);
   const [goal, setGoal] = useState<Profile["goal"] | null>(saved?.goal ?? null);
-  const [mealsPerDay, setMealsPerDay] = useState<Profile["mealsPerDay"] | null>(saved?.mealsPerDay ?? null);
-  const [weighInDay, setWeighInDay] = useState<Profile["weighInDay"] | null>(saved?.weighInDay ?? null);
-  const [diet, setDiet] = useState<Profile["diet"] | null>(saved?.diet ?? null);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -121,9 +84,6 @@ export function ProfileForm() {
     sex &&
     activityLevel &&
     goal &&
-    mealsPerDay !== null &&
-    weighInDay !== null &&
-    diet !== null &&
     Object.values(numberErrors).every((error) => error === null)
       ? {
           sex,
@@ -132,9 +92,6 @@ export function ProfileForm() {
           heightCm: parseNumber(numbers.heightCm)!,
           activityLevel,
           goal,
-          mealsPerDay,
-          weighInDay,
-          diet,
         }
       : null;
 
@@ -156,7 +113,8 @@ export function ProfileForm() {
     const ok = await saveProfile(profile);
     setSaving(false);
     // Se falhar, o aviso de erro aparece e o usuário continua no formulário.
-    if (ok) router.push("/");
+    // No cadastro, o próximo passo é a rotina.
+    if (ok) router.push(onboarding ? "/rotina" : "/");
   }
 
   return (
@@ -256,70 +214,6 @@ export function ProfileForm() {
             {showErrors && !goal && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
           </fieldset>
         </section>
-
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h3 className="font-semibold text-neutral-900">Rotina</h3>
-
-          <fieldset className="mt-4" data-invalid={showErrors && mealsPerDay === null ? true : undefined}>
-            <legend className="text-sm font-medium text-neutral-700">Refeições por dia</legend>
-            <p className="text-xs text-neutral-500">Quantas refeições você consegue fazer no dia.</p>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {MEALS_PER_DAY.map((count) => (
-                <OptionCard
-                  key={count}
-                  name="mealsPerDay"
-                  label={`${count} refeições`}
-                  checked={mealsPerDay === count}
-                  onChange={() => setMealsPerDay(count)}
-                />
-              ))}
-            </div>
-            {showErrors && mealsPerDay === null && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
-          </fieldset>
-
-          <fieldset className="mt-4" data-invalid={showErrors && weighInDay === null ? true : undefined}>
-            <legend className="text-sm font-medium text-neutral-700">Lembrete de pesagem</legend>
-            <p className="text-xs text-neutral-500">Dia da semana em que o app vai lembrar você de registrar o peso.</p>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-              {WEEKDAYS.map((day) => (
-                <OptionCard
-                  key={day.id}
-                  name="weighInDay"
-                  label={day.label}
-                  checked={weighInDay === day.id}
-                  onChange={() => setWeighInDay(day.id)}
-                />
-              ))}
-            </div>
-            {showErrors && weighInDay === null && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
-          </fieldset>
-        </section>
-
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h3 className="font-semibold text-neutral-900">Preferências alimentares</h3>
-          {!saved && (
-            <p className="mt-1 text-xs text-neutral-500">
-              Com essas informações, o assistente monta um plano alimentar feito para você.
-            </p>
-          )}
-
-          <fieldset className="mt-4" data-invalid={showErrors && diet === null ? true : undefined}>
-            <legend className="text-sm font-medium text-neutral-700">Tipo de alimentação</legend>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {DIETS.map((item) => (
-                <OptionCard
-                  key={item.id}
-                  name="diet"
-                  label={item.label}
-                  description={item.description}
-                  checked={diet === item.id}
-                  onChange={() => setDiet(item.id)}
-                />
-              ))}
-            </div>
-            {showErrors && diet === null && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
-          </fieldset>
-        </section>
       </div>
 
       <aside className="rounded-2xl bg-white p-5 shadow-sm lg:sticky lg:top-6">
@@ -377,7 +271,7 @@ export function ProfileForm() {
           disabled={saving}
           className="mt-5 w-full rounded-full bg-accent py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
         >
-          {saved ? "Salvar alterações" : "Salvar e continuar"}
+          {onboarding ? "Continuar" : "Salvar alterações"}
         </button>
       </aside>
     </form>

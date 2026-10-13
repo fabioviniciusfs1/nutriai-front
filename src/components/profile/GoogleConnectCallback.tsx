@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { completeGoogleConnect } from "@/lib/auth";
 import { Spinner } from "@/components/api/QueryStatus";
 
-/** Volta da conexão com o Google: confere o resultado e retorna ao perfil. */
+/** Volta da conexão com o Google: confere o resultado e retorna à página do Google Health. */
 export function GoogleConnectCallback() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +17,7 @@ export function GoogleConnectCallback() {
     if (started.current) return;
     started.current = true;
     const result = completeGoogleConnect(new URLSearchParams(window.location.search));
-    if (result.ok) router.replace("/perfil");
+    if (result.ok) router.replace("/google-health");
     // Adiado para fora do corpo do efeito, como uma resposta assíncrona.
     else queueMicrotask(() => setError(result.error));
   }, [router]);
@@ -31,11 +31,11 @@ export function GoogleConnectCallback() {
             {error}
           </p>
           <Link
-            href="/perfil"
+            href="/google-health"
             replace
             className="mt-5 inline-block rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:bg-accent/90"
           >
-            Voltar para o perfil
+            Voltar
           </Link>
         </>
       ) : (

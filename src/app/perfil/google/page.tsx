@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function GoogleConnectPage() {
   return (
-    <AuthGuard requireProfile={false}>
+    <AuthGuard requireProfile={false} requireRoutine={false}>
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <GoogleConnectCallback />
       </div>

@@ -2,11 +2,12 @@
 import { ApiError, apiFetch, apiUrl, setToken, useToken } from "@/lib/api/client";
 import { invalidate, mutate, useApiQuery } from "@/lib/api/query";
 import type { AuthResponse, GoogleLinkResponse, Me, Targets } from "@/lib/api/types";
-import type { Profile } from "@/lib/profile";
+import type { Profile, Routine } from "@/lib/profile";
 
 export type AuthState = {
   user: { name: string; username: string } | null;
   profile: Profile | null;
+  routine: Routine | null;
   targets: Targets | null;
   weighInDue: boolean;
   google: Me["google"];
@@ -14,7 +15,7 @@ export type AuthState = {
 
 type Result = { ok: true } | { ok: false; error: string };
 
-const SIGNED_OUT: AuthState = { user: null, profile: null, targets: null, weighInDue: false, google: null };
+const SIGNED_OUT: AuthState = { user: null, profile: null, routine: null, targets: null, weighInDue: false, google: null };
 
 export const ME_PATH = "/me";
 
@@ -161,6 +162,18 @@ export async function disconnectGoogle() {
 
 export function signOut() {
   setToken(null);
+}
+
+/**
+ * Salva a rotina. Na primeira vez, o backend começa a montar o plano individual; depois, o plano só é
+ * refeito se o usuário pedir (`personalizePlan`). `false` se falhou.
+ */
+export async function saveRoutine(routine: Routine) {
+  const me = await mutate<Me>("/me/routine", "PUT", routine, {
+    update: ME_PATH,
+    invalidate: ["/plan", "/nutrition", "/history"],
+  });
+  return me !== null;
 }
 
 /** Salva o perfil; o backend recalcula as metas e o plano. `false` se falhou. */

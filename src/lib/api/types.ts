@@ -2,7 +2,7 @@
 // O backend faz todas as contas (metas, plano do dia, porções, trocas, estatísticas); o front só exibe.
 import type { FoodFeedback } from "@/lib/food-feedback";
 import type { FoodGroup } from "@/lib/food-groups";
-import type { Profile } from "@/lib/profile";
+import type { Profile, Routine } from "@/lib/profile";
 
 // ---------------------------------------------------------------------------------------------
 // Usuário
@@ -24,8 +24,10 @@ export type Me = {
   user: { name: string; username: string };
   /** `null` até o usuário preencher o perfil. */
   profile: Profile | null;
+  /** `null` até o usuário preencher a rotina (segundo passo do cadastro). */
+  routine: Routine | null;
   targets: Targets | null;
-  /** Hoje é o dia de pesagem do perfil e ainda não há peso registrado hoje. */
+  /** Hoje é o dia de pesagem da rotina e ainda não há peso registrado hoje. */
   weighInDue: boolean;
   /**
    * Conta Google conectada (dá acesso à Google Health API); `null` se não houver.
@@ -67,9 +69,9 @@ export type PlanMeal = {
 
 /** Plano de hoje já com todas as mudanças do usuário, ordenado por horário. */
 /**
- * Plano individual montado pelo assistente na primeira vez que o perfil é salvo: `pending` enquanto monta
- * (o plano padrão aparece por baixo), `failed` se não deu certo (`POST /plan/personalize` tenta de novo),
- * `ready` quando aplicado e `null` se nunca foi pedido.
+ * Plano individual montado pelo assistente na primeira vez que a rotina é salva (e quando o usuário pede para
+ * refazer, com `POST /plan/personalize`): `pending` enquanto monta (o plano atual aparece por baixo), `failed`
+ * se não deu certo, `ready` quando aplicado e `null` se nunca foi pedido.
  */
 export type Personalization = "pending" | "ready" | "failed" | null;
 

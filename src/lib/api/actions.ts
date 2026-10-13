@@ -32,7 +32,7 @@ export function createMeal(title: string, time: string) {
   return planMutation("/plan/meals", "POST", { title, time });
 }
 
-/** Tenta de novo montar o plano individual (depois de uma falha); a montagem segue em segundo plano. */
+/** Monta de novo o plano individual (depois de uma falha ou de mudar a rotina); a montagem segue em segundo plano. */
 export function personalizePlan() {
   return planMutation("/plan/personalize", "POST");
 }

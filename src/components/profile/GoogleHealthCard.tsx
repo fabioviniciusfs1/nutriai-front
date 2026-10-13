@@ -34,17 +34,20 @@ export function GoogleHealthCard() {
 
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-          <HeartPulse size={20} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-neutral-900">Google Health</h3>
-          <p className="text-sm text-neutral-500">
-            {google
-              ? `Conectado como ${google.email}. Sua atividade e as calorias gastas vêm do Google Health.`
-              : "Conecte sua conta Google para importar atividade física e calorias gastas."}
-          </p>
+      {/* No celular, o botão fica embaixo do texto, na largura toda; a partir do sm, ao lado. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+            <HeartPulse size={20} />
+          </span>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-neutral-900">Google Health</h3>
+            <p className="break-words text-sm text-neutral-500">
+              {google
+                ? `Conectado como ${google.email}. Sua atividade e as calorias gastas vêm do Google Health.`
+                : "Conecte sua conta Google para importar atividade física e calorias gastas."}
+            </p>
+          </div>
         </div>
 
         {google ? (
@@ -52,7 +55,7 @@ export function GoogleHealthCard() {
             <button
               type="button"
               onClick={() => setConfirmingDisconnect(true)}
-              className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+              className="w-full shrink-0 rounded-full border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 sm:w-auto"
             >
               Desconectar
             </button>
@@ -62,7 +65,7 @@ export function GoogleHealthCard() {
             type="button"
             onClick={connect}
             disabled={redirecting}
-            className="flex items-center gap-2 rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50 disabled:opacity-60"
+            className="flex w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50 disabled:opacity-60 sm:w-auto"
           >
             <GoogleIcon size={16} />
             {redirecting ? "Abrindo o Google…" : "Conectar com o Google"}

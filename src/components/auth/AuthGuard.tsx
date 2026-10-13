@@ -11,15 +11,25 @@ type AuthGuardProps = {
   children: React.ReactNode;
   /** Exige perfil preenchido; sem ele o usuário é levado para /perfil. */
   requireProfile?: boolean;
+  /** Exige rotina preenchida (segundo passo do cadastro); sem ela o usuário é levado para /rotina. */
+  requireRoutine?: boolean;
 };
 
-export function AuthGuard({ children, requireProfile = true }: AuthGuardProps) {
+export function AuthGuard({ children, requireProfile = true, requireRoutine = true }: AuthGuardProps) {
   const { auth, error: sessionError, retry } = useSession();
   const mutationError = useMutationError();
   const router = useRouter();
 
   const redirectTo =
-    auth === undefined ? null : !auth.user ? "/login" : requireProfile && !auth.profile ? "/perfil" : null;
+    auth === undefined
+      ? null
+      : !auth.user
+        ? "/login"
+        : requireProfile && !auth.profile
+          ? "/perfil"
+          : requireRoutine && !auth.routine
+            ? "/rotina"
+            : null;
 
   useEffect(() => {
     if (redirectTo) router.replace(redirectTo);

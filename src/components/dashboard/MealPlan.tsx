@@ -54,7 +54,7 @@ function PersonalizingCard() {
         <Spinner />
         <p className="font-medium text-neutral-900">Montando seu plano personalizado…</p>
         <p className="max-w-sm text-sm text-neutral-500">
-          O assistente está escolhendo as refeições a partir do seu perfil. Isso leva alguns segundos.
+          O assistente está escolhendo as refeições a partir do seu perfil e da sua rotina. Isso leva alguns segundos.
         </p>
       </div>
     </div>
