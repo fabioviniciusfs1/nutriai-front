@@ -6,6 +6,7 @@ import { saveProfile, useAuth } from "@/lib/auth";
 import { ApiError, apiFetch } from "@/lib/api/client";
 import type { Targets } from "@/lib/api/types";
 import { ACTIVITY_LEVELS, GOALS, SEXES, type Profile } from "@/lib/profile";
+import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import { OptionCard } from "@/components/profile/OptionCard";
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
@@ -54,18 +55,21 @@ export function ProfileForm() {
   const auth = useAuth();
   const router = useRouter();
   const saved = auth?.profile;
-  const onboarding = !auth?.routine;
+  // O perfil é informado no cadastro (até a rotina ser salva); depois fica só para leitura.
+  const readOnly = !!auth?.routine;
 
   const [sex, setSex] = useState<Profile["sex"] | null>(saved?.sex ?? null);
   const [numbers, setNumbers] = useState<Record<NumericKey, string>>({
     age: saved ? String(saved.age) : "",
-    weightKg: saved ? String(saved.weightKg).replace(".", ",") : "",
+    // O valor de um campo numérico sempre usa ponto (o navegador exibe conforme o idioma); com vírgula ele fica vazio.
+    weightKg: saved ? String(saved.weightKg) : "",
     heightCm: saved ? String(saved.heightCm) : "",
   });
   const [activityLevel, setActivityLevel] = useState<Profile["activityLevel"] | null>(saved?.activityLevel ?? null);
   const [goal, setGoal] = useState<Profile["goal"] | null>(saved?.goal ?? null);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const numberErrors = Object.fromEntries(
     NUMERIC_FIELDS.map((field) => {
@@ -98,8 +102,9 @@ export function ProfileForm() {
   const estimateResult = useEstimate(profile);
   const estimate = estimateResult?.targets;
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (readOnly) return;
     if (!profile) {
       setShowErrors(true);
       // No celular o botão fica no fim do formulário: leva o usuário até o primeiro campo com erro.
@@ -109,171 +114,198 @@ export function ProfileForm() {
       });
       return;
     }
+    // A pessoa confirma os dados antes de seguir: eles não mudam depois.
+    setConfirming(true);
+  }
+
+  async function save(data: Profile) {
     setSaving(true);
-    const ok = await saveProfile(profile);
+    const ok = await saveProfile(data);
     setSaving(false);
     // Se falhar, o aviso de erro aparece e o usuário continua no formulário.
-    // No cadastro, o próximo passo é a rotina.
-    if (ok) router.push(onboarding ? "/rotina" : "/");
+    // O próximo passo do cadastro é a rotina.
+    if (ok) router.push("/rotina");
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-      <div className="flex flex-col gap-4 lg:col-span-2">
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h3 className="font-semibold text-neutral-900">Dados corporais</h3>
+    <>
+      <form onSubmit={handleSubmit} noValidate className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+        {/* `disabled` no fieldset desativa todos os campos de uma vez. */}
+        <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-4 lg:col-span-2">
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <h3 className="font-semibold text-neutral-900">Dados corporais</h3>
 
-          <fieldset className="mt-4" data-invalid={showErrors && !sex ? true : undefined}>
-            <legend className="text-sm font-medium text-neutral-700">Sexo biológico</legend>
-            <p className="text-xs text-neutral-500">Usado na fórmula de gasto energético.</p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {SEXES.map((item) => (
-                <OptionCard
-                  key={item.id}
-                  name="sex"
-                  label={item.label}
-                  checked={sex === item.id}
-                  onChange={() => setSex(item.id)}
-                />
-              ))}
-            </div>
-            {showErrors && !sex && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
-          </fieldset>
+            <fieldset className="mt-4" data-invalid={showErrors && !sex ? true : undefined}>
+              <legend className="text-sm font-medium text-neutral-700">Sexo biológico</legend>
+              <p className="text-xs text-neutral-500">Usado na fórmula de gasto energético.</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {SEXES.map((item) => (
+                  <OptionCard
+                    key={item.id}
+                    name="sex"
+                    label={item.label}
+                    checked={sex === item.id}
+                    onChange={() => setSex(item.id)}
+                  />
+                ))}
+              </div>
+              {showErrors && !sex && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
+            </fieldset>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {NUMERIC_FIELDS.map((field) => {
-              const error = showErrors ? numberErrors[field.key] : null;
-              return (
-                <label
-                  key={field.key}
-                  data-invalid={error ? true : undefined}
-                  className="flex flex-col gap-1.5 text-sm font-medium text-neutral-700"
-                >
-                  {field.label}
-                  <span className="relative">
-                    <input
-                      type="number"
-                      inputMode={field.inputMode}
-                      min={field.min}
-                      max={field.max}
-                      step={field.step}
-                      value={numbers[field.key]}
-                      onChange={(event) => setNumbers((current) => ({ ...current, [field.key]: event.target.value }))}
-                      aria-invalid={error ? true : undefined}
-                      className={`w-full rounded-xl border bg-white px-3 py-2.5 pr-14 text-sm text-neutral-900 outline-none transition-colors focus:ring-2 ${
-                        error
-                          ? "border-red-400 focus:ring-red-100"
-                          : "border-neutral-200 focus:border-accent focus:ring-accent/20"
-                      }`}
-                    />
-                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-neutral-400">
-                      {field.unit}
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {NUMERIC_FIELDS.map((field) => {
+                const error = showErrors ? numberErrors[field.key] : null;
+                return (
+                  <label
+                    key={field.key}
+                    data-invalid={error ? true : undefined}
+                    className="flex flex-col gap-1.5 text-sm font-medium text-neutral-700"
+                  >
+                    {field.label}
+                    <span className="relative">
+                      <input
+                        type="number"
+                        inputMode={field.inputMode}
+                        min={field.min}
+                        max={field.max}
+                        step={field.step}
+                        value={numbers[field.key]}
+                        onChange={(event) => setNumbers((current) => ({ ...current, [field.key]: event.target.value }))}
+                        aria-invalid={error ? true : undefined}
+                        className={`w-full rounded-xl border bg-white px-3 py-2.5 pr-14 text-sm text-neutral-900 outline-none transition-colors focus:ring-2 ${
+                          error
+                            ? "border-red-400 focus:ring-red-100"
+                            : "border-neutral-200 focus:border-accent focus:ring-accent/20"
+                        }`}
+                      />
+                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-neutral-400">
+                        {field.unit}
+                      </span>
                     </span>
-                  </span>
-                  {error && <span className="text-xs font-normal text-red-600">{error}</span>}
-                </label>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <fieldset data-invalid={showErrors && !activityLevel ? true : undefined}>
-            <legend className="font-semibold text-neutral-900">Frequência de atividade física</legend>
-            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {ACTIVITY_LEVELS.map((level) => (
-                <OptionCard
-                  key={level.id}
-                  name="activityLevel"
-                  label={level.label}
-                  description={level.description}
-                  checked={activityLevel === level.id}
-                  onChange={() => setActivityLevel(level.id)}
-                />
-              ))}
+                    {error && <span className="text-xs font-normal text-red-600">{error}</span>}
+                  </label>
+                );
+              })}
             </div>
-            {showErrors && !activityLevel && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
-          </fieldset>
-        </section>
+          </section>
 
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <fieldset data-invalid={showErrors && !goal ? true : undefined}>
-            <legend className="font-semibold text-neutral-900">Objetivo</legend>
-            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {GOALS.map((item) => (
-                <OptionCard
-                  key={item.id}
-                  name="goal"
-                  label={item.label}
-                  description={item.description}
-                  checked={goal === item.id}
-                  onChange={() => setGoal(item.id)}
-                />
-              ))}
-            </div>
-            {showErrors && !goal && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
-          </fieldset>
-        </section>
-      </div>
-
-      <aside className="rounded-2xl bg-white p-5 shadow-sm lg:sticky lg:top-6">
-        <h3 className="font-semibold text-neutral-900">Sua meta diária</h3>
-
-        {estimate && profile ? (
-          <>
-            <p className="mt-4 text-4xl font-semibold text-neutral-900">
-              {numberFormat.format(estimate.calories)}
-              <span className="ml-1 text-base font-medium text-neutral-400">kcal</span>
-            </p>
-            <p className="mt-1 text-sm text-neutral-500">
-              {GOALS.find((item) => item.id === profile.goal)!.label}
-            </p>
-
-            <dl className="mt-5 flex flex-col gap-3 border-t border-neutral-100 pt-4 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt className="text-neutral-500">Taxa metabólica basal</dt>
-                <dd className="font-medium text-neutral-900">{numberFormat.format(estimate.bmr)} kcal</dd>
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <fieldset data-invalid={showErrors && !activityLevel ? true : undefined}>
+              <legend className="font-semibold text-neutral-900">Frequência de atividade física</legend>
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {ACTIVITY_LEVELS.map((level) => (
+                  <OptionCard
+                    key={level.id}
+                    name="activityLevel"
+                    label={level.label}
+                    description={level.description}
+                    checked={activityLevel === level.id}
+                    onChange={() => setActivityLevel(level.id)}
+                  />
+                ))}
               </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-neutral-500">Gasto diário estimado</dt>
-                <dd className="font-medium text-neutral-900">{numberFormat.format(estimate.tdee)} kcal</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-neutral-500">Água</dt>
-                <dd className="font-medium text-neutral-900">
-                  {numberFormat.format(estimate.waterLiters)} L
-                </dd>
-              </div>
-            </dl>
+              {showErrors && !activityLevel && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
+            </fieldset>
+          </section>
 
-            {estimate.clampedToMinimum && (
-              <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
-                A meta foi ajustada para o mínimo recomendado. Para déficits maiores, procure um nutricionista.
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <fieldset data-invalid={showErrors && !goal ? true : undefined}>
+              <legend className="font-semibold text-neutral-900">Objetivo</legend>
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {GOALS.map((item) => (
+                  <OptionCard
+                    key={item.id}
+                    name="goal"
+                    label={item.label}
+                    description={item.description}
+                    checked={goal === item.id}
+                    onChange={() => setGoal(item.id)}
+                  />
+                ))}
+              </div>
+              {showErrors && !goal && <p className="mt-1 text-xs text-red-600">Selecione uma opção</p>}
+            </fieldset>
+          </section>
+        </fieldset>
+
+        <aside className="rounded-2xl bg-white p-5 shadow-sm lg:sticky lg:top-6">
+          <h3 className="font-semibold text-neutral-900">Sua meta diária</h3>
+
+          {estimate && profile ? (
+            <>
+              <p className="mt-4 text-4xl font-semibold text-neutral-900">
+                {numberFormat.format(estimate.calories)}
+                <span className="ml-1 text-base font-medium text-neutral-400">kcal</span>
               </p>
-            )}
-          </>
-        ) : (
-          <p className="mt-4 text-sm text-neutral-500">
-            {!profile
-              ? "Preencha seus dados para calcular quantas calorias seu plano alimentar deve ter."
-              : estimateResult?.error
-                ? `Não foi possível calcular a meta: ${estimateResult.error}`
-                : "Calculando…"}
+              <p className="mt-1 text-sm text-neutral-500">
+                {GOALS.find((item) => item.id === profile.goal)!.label}
+              </p>
+
+              <dl className="mt-5 flex flex-col gap-3 border-t border-neutral-100 pt-4 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-neutral-500">Taxa metabólica basal</dt>
+                  <dd className="font-medium text-neutral-900">{numberFormat.format(estimate.bmr)} kcal</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-neutral-500">Gasto diário estimado</dt>
+                  <dd className="font-medium text-neutral-900">{numberFormat.format(estimate.tdee)} kcal</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-neutral-500">Água</dt>
+                  <dd className="font-medium text-neutral-900">
+                    {numberFormat.format(estimate.waterLiters)} L
+                  </dd>
+                </div>
+              </dl>
+
+              {estimate.clampedToMinimum && (
+                <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+                  A meta foi ajustada para o mínimo recomendado. Para déficits maiores, procure um nutricionista.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="mt-4 text-sm text-neutral-500">
+              {!profile
+                ? "Preencha seus dados para calcular quantas calorias seu plano alimentar deve ter."
+                : estimateResult?.error
+                  ? `Não foi possível calcular a meta: ${estimateResult.error}`
+                  : "Calculando…"}
+            </p>
+          )}
+
+          <p className="mt-4 text-xs text-neutral-400">
+            Estimativa calculada a partir dos seus dados. Não substitui a orientação de um profissional.
           </p>
-        )}
 
-        <p className="mt-4 text-xs text-neutral-400">
-          Estimativa calculada a partir dos seus dados. Não substitui a orientação de um profissional.
-        </p>
+          {readOnly ? (
+            <p className="mt-4 rounded-xl bg-neutral-50 p-3 text-xs text-neutral-600">
+              Estes dados foram informados no cadastro e não podem ser alterados.
+            </p>
+          ) : (
+            <button
+              type="submit"
+              disabled={saving}
+              className="mt-5 w-full rounded-full bg-accent py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+            >
+              Continuar
+            </button>
+          )}
+        </aside>
+      </form>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="mt-5 w-full rounded-full bg-accent py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-        >
-          {onboarding ? "Continuar" : "Salvar alterações"}
-        </button>
-      </aside>
-    </form>
+      <ConfirmDialog
+        open={confirming}
+        title="As informações estão corretas?"
+        description="Confira seus dados antes de continuar."
+        confirmLabel="Confirmar"
+        cancelLabel="Revisar"
+        onConfirm={() => {
+          setConfirming(false);
+          if (profile) void save(profile);
+        }}
+        onCancel={() => setConfirming(false)}
+      />
+    </>
   );
 }

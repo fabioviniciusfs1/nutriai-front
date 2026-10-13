@@ -92,6 +92,7 @@ export function RoutineForm() {
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
   const [askingRebuild, setAskingRebuild] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const busyHours = unavailableHours(busyTimes(times, trains));
   const sameTraining = trains === true && times.trainingStart === times.trainingEnd;
@@ -142,8 +143,14 @@ export function RoutineForm() {
       });
       return;
     }
+    // No cadastro, a pessoa confirma os dados antes de o plano ser montado.
+    if (saved) await save(routine);
+    else setConfirming(true);
+  }
+
+  async function save(data: Routine) {
     setSaving(true);
-    const ok = await saveRoutine(routine);
+    const ok = await saveRoutine(data);
     setSaving(false);
     // Se falhar, o aviso de erro aparece e o usuário continua no formulário.
     if (!ok) return;
@@ -406,6 +413,19 @@ export function RoutineForm() {
           setPicking(null);
         }}
         onCancel={() => setPicking(null)}
+      />
+
+      <ConfirmDialog
+        open={confirming}
+        title="As informações estão corretas?"
+        description="Com elas o assistente monta seu plano alimentar. Você pode alterar depois em Rotina."
+        confirmLabel="Confirmar"
+        cancelLabel="Revisar"
+        onConfirm={() => {
+          setConfirming(false);
+          if (routine) void save(routine);
+        }}
+        onCancel={() => setConfirming(false)}
       />
 
       <ConfirmDialog

@@ -16,7 +16,7 @@ export function OptionCard({
 }) {
   return (
     <label
-      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
+      className={`flex cursor-pointer items-start has-disabled:cursor-default gap-3 rounded-xl border p-3 transition-colors ${
         checked ? "border-accent bg-accent/5" : "border-neutral-200 hover:border-neutral-300"
       }`}
     >
