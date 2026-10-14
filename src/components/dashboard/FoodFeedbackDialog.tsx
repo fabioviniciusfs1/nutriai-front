@@ -2,9 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
+import { ApiError, apiFetch } from "@/lib/api/client";
 import { useApiQuery } from "@/lib/api/query";
 import type { PlanFood } from "@/lib/api/types";
 import { Spinner } from "@/components/api/QueryStatus";
+
+/** Quantos nomes já mostrados o backend aceita no "Ver mais"; com isso na tela, o botão some. */
+const MAX_SHOWN_SUBSTITUTES = 64;
 
 type FoodFeedbackDialogProps = {
   /** Refeição onde o botão foi clicado ("Não quero" troca só nela); `null` = diálogo fechado. */
@@ -22,10 +26,14 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
   const [choice, setChoice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Substitutos do mesmo grupo, já na porção com as mesmas calorias, escolhidos pelo backend.
-  const substitutes = useApiQuery<PlanFood[]>(
-    open ? `/plan/meals/${mealId}/substitutes?food=${encodeURIComponent(foodName)}` : null
-  );
-  const options = substitutes.data ?? [];
+  const substitutesPath = `/plan/meals/${mealId}/substitutes?food=${encodeURIComponent(foodName)}`;
+  const substitutes = useApiQuery<PlanFood[]>(open ? substitutesPath : null);
+  // "Ver mais": opções novas pedidas ao backend sem as que já estão na tela.
+  const [more, setMore] = useState<PlanFood[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [exhausted, setExhausted] = useState(false);
+  const [moreError, setMoreError] = useState<string | null>(null);
+  const options = [...(substitutes.data ?? []), ...more];
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -33,12 +41,31 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
     if (open && !dialog.open) {
       setReason(null);
       setChoice(null);
+      setMore([]);
+      setExhausted(false);
+      setMoreError(null);
       dialog.showModal();
     }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
   const hasOptions = options.length > 0;
+  const canLoadMore = hasOptions && !exhausted && options.length < MAX_SHOWN_SUBSTITUTES;
+
+  async function loadMore() {
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      const exclude = options.map((option) => `&exclude=${encodeURIComponent(option.name)}`).join("");
+      const found = await apiFetch<PlanFood[]>(`${substitutesPath}${exclude}`);
+      if (found.length === 0) setExhausted(true);
+      else setMore((current) => [...current, ...found]);
+    } catch (loadError) {
+      setMoreError(loadError instanceof ApiError ? loadError.message : "Erro inesperado.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
   const descriptions: Record<FoodFeedback, string> = {
     "nao-gosto": `${foodName} sai de todas as refeições.`,
     "nao-quero": `${foodName} sai só de “${mealTitle}”. As outras refeições continuam com ele.`,
@@ -154,6 +181,21 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
               </label>
             ))}
           </fieldset>
+        )}
+
+        {hasOptions && (
+          <div className="mt-3 flex min-h-6 flex-col items-center gap-1 text-center">
+            {loadingMore ? (
+              <Spinner className="h-5 w-5" />
+            ) : canLoadMore ? (
+              <button type="button" onClick={loadMore} className="text-sm font-medium text-accent hover:underline">
+                Ver mais
+              </button>
+            ) : (
+              exhausted && <p className="text-sm text-neutral-500">Não há mais opções.</p>
+            )}
+            {moreError && <p className="text-sm text-neutral-600">{moreError}</p>}
+          </div>
         )}
 
         <p className="mt-3 text-xs text-neutral-500">
