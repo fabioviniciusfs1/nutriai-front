@@ -40,9 +40,10 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
 
   const hasOptions = options.length > 0;
   const descriptions: Record<FoodFeedback, string> = {
-    "nao-gosto": `${foodName} sai de todas as refeições, também nos próximos dias.`,
-    "nao-quero": `${foodName} sai só de “${mealTitle}”, também nos próximos dias. As outras refeições continuam com ele.`,
-    "nao-tenho": `${foodName} sai de todas as refeições, também nos próximos dias.`,
+    "nao-gosto": `${foodName} sai de todas as refeições.`,
+    "nao-quero": `${foodName} sai só de “${mealTitle}”. As outras refeições continuam com ele.`,
+    "nao-tenho": `${foodName} sai de todas as refeições.`,
+    "nao-posso": `${foodName} sai de todas as refeições.`,
   };
 
   return (
@@ -55,7 +56,7 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
       onClick={(event) => {
         if (event.target === event.currentTarget) onCancel();
       }}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-0 shadow-xl backdrop:bg-black/40"
+      className="m-auto w-[calc(100%-2rem)] max-w-4xl rounded-2xl bg-white p-0 shadow-xl backdrop:bg-black/40"
     >
       <form
         className="p-5"
@@ -70,7 +71,7 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
         <h4 className="font-semibold text-neutral-900">Substituir alimento?</h4>
         <p className="mt-1 text-sm text-neutral-600">Por que trocar &ldquo;{foodName}&rdquo;?</p>
 
-        <fieldset className="mt-4 flex min-w-0 flex-col gap-2">
+        <fieldset className="mt-4 grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2">
           <legend className="sr-only">Motivo da troca</legend>
           {FOOD_FEEDBACK.map(({ id, label, Icon }) => (
             <label
@@ -123,7 +124,7 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
         )}
 
         {hasOptions && (
-          <fieldset className="mt-2 flex min-w-0 flex-col gap-2">
+          <fieldset className="mt-2 grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2">
             <legend className="sr-only">Substituto</legend>
             {options.map((option) => (
               <label
@@ -141,7 +142,7 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
                   className="h-4 w-4 shrink-0 accent-accent"
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-neutral-900">{option.name}</span>
+                  <span className="block break-words text-sm font-medium text-neutral-900">{option.name}</span>
                   <span className="mt-0.5 block text-xs text-neutral-500">
                     {option.carbs}g carb. · {option.protein}g prot. · {option.fat}g gord.
                   </span>
