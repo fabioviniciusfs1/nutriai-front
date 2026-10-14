@@ -1,7 +1,7 @@
 // Alterações do plano, dos alimentos e dos pesos. O backend aplica as regras e devolve o
 // resultado já calculado; o front só atualiza o cache. Cada função devolve `null` se falhou.
 import { mutate } from "@/lib/api/query";
-import type { RemoveMealOption, RestrictedFood, TodayPlan, WeightEntry } from "@/lib/api/types";
+import type { RestrictedFood, TodayPlan, WeightEntry } from "@/lib/api/types";
 import type { FoodFeedback } from "@/lib/food-feedback";
 import { ME_PATH } from "@/lib/auth";
 
@@ -22,14 +22,6 @@ function planMutation(path: string, method: string, body?: unknown, alsoInvalida
 
 export function changeMealTime(mealId: number, time: string) {
   return planMutation(`/plan/meals/${mealId}/time`, "PUT", { time });
-}
-
-export function removeMeal(mealId: number, option: RemoveMealOption) {
-  return planMutation(`/plan/meals/${mealId}/removal`, "POST", { option });
-}
-
-export function createMeal(title: string, time: string) {
-  return planMutation("/plan/meals", "POST", { title, time });
 }
 
 /** Monta de novo o plano individual (depois de uma falha ou de mudar a rotina); a montagem segue em segundo plano. */

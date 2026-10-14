@@ -1,29 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeftRight, Clock, Flame, Wheat, Drumstick, Droplet, Plus, PlusCircle, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Clock, Flame, Wheat, Drumstick, Droplet, PlusCircle, Trash2 } from "lucide-react";
 import type { FoodFeedback } from "@/lib/food-feedback";
-import type { RemoveMealOption, TodayPlan } from "@/lib/api/types";
+import type { TodayPlan } from "@/lib/api/types";
 import { invalidate, useApiQuery } from "@/lib/api/query";
 import {
   addFood,
   changeMealTime,
-  createMeal,
   personalizePlan,
   removeExtraFood,
-  removeMeal,
   swapFood,
   TODAY_PLAN_PATH,
 } from "@/lib/api/actions";
 import { QueryStatus, Spinner } from "@/components/api/QueryStatus";
 import { FoodFeedbackDialog } from "@/components/dashboard/FoodFeedbackDialog";
 import { TimePickerDialog } from "@/components/dashboard/TimePickerDialog";
-import { RemoveMealDialog } from "@/components/dashboard/RemoveMealDialog";
-import { CreateMealDialog } from "@/components/dashboard/CreateMealDialog";
 import { AddFoodDialog } from "@/components/dashboard/AddFoodDialog";
 
 /**
- * Plano de hoje, já calculado pelo backend (trocas, porções, refeições criadas/removidas). Cada
+ * Plano de hoje, já calculado pelo backend (trocas, porções, alimentos acrescentados). Cada
  * ação envia um pedido e a resposta é o plano atualizado.
  */
 export function MealPlan() {
@@ -87,33 +83,19 @@ function PersonalizationNotice({ personalization }: { personalization: TodayPlan
 function MealPlanView({ plan }: { plan: TodayPlan }) {
   const [time, setTime] = useState("Todos");
   const [editingTime, setEditingTime] = useState<{ id: number; title: string; time: string } | null>(null);
-  const [removing, setRemoving] = useState<number | null>(null);
-  const [creating, setCreating] = useState(false);
   const [addingFoodTo, setAddingFoodTo] = useState<number | null>(null);
   const [pending, setPending] = useState<{ mealId: number; mealTitle: string; foodName: string } | null>(null);
 
   const mealTimes = ["Todos", ...new Set(plan.meals.map((meal) => meal.time))];
-  // Se a refeição do filtro ativo foi removida, volta para "Todos".
+  // Se nenhuma refeição tem mais o horário do filtro ativo, volta para "Todos".
   const activeTime = mealTimes.includes(time) ? time : "Todos";
   const meals = plan.meals.filter((meal) => activeTime === "Todos" || meal.time === activeTime);
 
-  const removingMeal = plan.meals.find((meal) => meal.id === removing);
   const addingFoodMeal = plan.meals.find((meal) => meal.id === addingFoodTo);
 
   // Os diálogos só fecham se o backend aceitou; se falhar, o aviso de erro aparece e dá para tentar de novo.
   async function confirmFeedback(reason: FoodFeedback, substitute: string | null) {
     if (pending && (await swapFood(pending.mealId, pending.foodName, reason, substitute))) setPending(null);
-  }
-
-  async function confirmRemoval(option: RemoveMealOption) {
-    if (removing !== null && (await removeMeal(removing, option))) setRemoving(null);
-  }
-
-  async function confirmCreate(title: string, mealTime: string) {
-    if (await createMeal(title, mealTime)) {
-      setTime("Todos");
-      setCreating(false);
-    }
   }
 
   async function confirmAddFood(foodName: string) {
@@ -131,17 +113,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-semibold text-neutral-900">Plano Alimentar</h3>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          disabled={!plan.canCreateMeal}
-          className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Plus size={16} /> Nova refeição
-        </button>
-      </div>
+      <h3 className="font-semibold text-neutral-900">Plano Alimentar</h3>
 
       <div className="mt-4 flex flex-wrap gap-2">
         {mealTimes.map((item) => (
@@ -191,15 +163,6 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
                   className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-green-50 hover:text-green-600"
                 >
                   <PlusCircle size={16} />
-                </button>
-                <button
-                  type="button"
-                  title="Remover refeição"
-                  aria-label={`Remover refeição: ${meal.title}`}
-                  onClick={() => setRemoving(meal.id)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                >
-                  <Trash2 size={16} />
                 </button>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-500">
@@ -294,16 +257,6 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
         value={editingTime?.time ?? "00:00"}
         onConfirm={confirmTime}
         onCancel={() => setEditingTime(null)}
-      />
-
-      <CreateMealDialog open={creating} onConfirm={confirmCreate} onCancel={() => setCreating(false)} />
-
-      <RemoveMealDialog
-        mealId={removingMeal?.id ?? null}
-        mealTitle={removingMeal?.title ?? ""}
-        mealKcal={removingMeal?.totals.kcal ?? 0}
-        onConfirm={confirmRemoval}
-        onCancel={() => setRemoving(null)}
       />
 
       <AddFoodDialog
