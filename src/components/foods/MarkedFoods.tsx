@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, Undo2 } from "lucide-react";
-import { FOOD_FEEDBACK } from "@/lib/food-feedback";
+import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
 import { FOOD_GROUPS } from "@/lib/food-groups";
 import { useApiQuery } from "@/lib/api/query";
 import { releaseFood, RESTRICTED_FOODS_PATH } from "@/lib/api/actions";
@@ -16,9 +16,13 @@ import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 export function MarkedFoods() {
   const restricted = useApiQuery<RestrictedFood[]>(RESTRICTED_FOODS_PATH);
   const [releasing, setReleasing] = useState<string | null>(null);
+  const [tab, setTab] = useState<FoodFeedback>("nao-gosto");
 
   const foods = restricted.data ?? [];
-  const total = foods.length;
+  const current = FOOD_FEEDBACK.find((item) => item.id === tab)!;
+  const marked = foods
+    .filter((food) => food.feedback === tab)
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
   return (
     <>
@@ -30,70 +34,88 @@ export function MarkedFoods() {
         </p>
       </div>
 
+      {/*
+        Uma aba por motivo. No celular a barra ocupa a largura da página e as abas rolam por dentro dela: duas cabem e
+        ~20% da terceira aparece cortada na borda (2,2 abas na largura), para mostrar que dá para deslizar.
+      */}
+      <div
+        role="tablist"
+        aria-label="Motivo"
+        className="flex gap-0.5 overflow-x-auto rounded-full bg-neutral-100 p-1 sm:w-fit sm:gap-1"
+      >
+        {FOOD_FEEDBACK.map(({ id, label, Icon }) => {
+          const selected = tab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`tab-${id}`}
+              aria-selected={selected}
+              aria-controls="foods-panel"
+              onClick={() => setTab(id)}
+              className={`flex w-[calc((100vw-2.5rem-4px)/2.2)] min-w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-2 text-sm font-medium transition-colors sm:w-auto sm:gap-2 sm:px-4 ${
+                selected ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500 hover:text-neutral-700"
+              }`}
+            >
+              <Icon size={16} className={selected ? "text-neutral-700" : "text-neutral-400"} /> {label}
+              {restricted.data && (
+                <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-600 sm:px-2">
+                  {foods.filter((food) => food.feedback === id).length}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       {!restricted.data && <QueryStatus error={restricted.error} onRetry={restricted.reload} />}
 
-      {restricted.data && total === 0 && (
-        <div className="rounded-2xl bg-white p-8 text-center text-sm text-neutral-500 shadow-sm">
-          Nenhum alimento marcado. Use o botão &ldquo;Substituir alimento&rdquo; nos alimentos do plano
-          alimentar.
-        </div>
+      {restricted.data && (
+        <section
+          role="tabpanel"
+          id="foods-panel"
+          aria-labelledby={`tab-${tab}`}
+          className="rounded-2xl bg-white p-5 shadow-sm"
+        >
+          {marked.length === 0 ? (
+            <p className="py-6 text-center text-sm text-neutral-500">
+              Nenhum alimento marcado como &ldquo;{current.label}&rdquo;. Use o botão &ldquo;Substituir
+              alimento&rdquo; nos alimentos do plano alimentar.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-neutral-100">
+              {marked.map(({ name, group, onlyInMeal, substitute }) => (
+                <li key={name} className="flex items-center gap-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-neutral-900">{name}</p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-neutral-500">
+                      {group && <span>{FOOD_GROUPS[group]} ·</span>}
+                      {onlyInMeal ? (
+                        "trocado só na refeição marcada"
+                      ) : substitute ? (
+                        <>
+                          substituído por <ArrowRight size={12} />
+                          <span className="font-medium text-neutral-700">{substitute}</span>
+                        </>
+                      ) : (
+                        "removido das refeições"
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReleasing(name)}
+                    className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                  >
+                    <Undo2 size={14} /> Liberar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
-
-      <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-3">
-        {total > 0 &&
-          FOOD_FEEDBACK.map(({ id, label, Icon }) => {
-            const marked = foods
-              .filter((food) => food.feedback === id)
-              .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-
-            return (
-              <section key={id} className="rounded-2xl bg-white p-5 shadow-sm">
-                <h3 className="flex items-center gap-2 font-semibold text-neutral-900">
-                  <Icon size={18} className="text-neutral-500" /> {label}
-                  <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
-                    {marked.length}
-                  </span>
-                </h3>
-
-                {marked.length === 0 ? (
-                  <p className="mt-3 text-sm text-neutral-400">Nenhum alimento.</p>
-                ) : (
-                  <ul className="mt-3 flex flex-col divide-y divide-neutral-100">
-                    {marked.map(({ name, group, onlyInMeal, substitute }) => {
-                      return (
-                        <li key={name} className="flex items-center gap-3 py-3">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-neutral-900">{name}</p>
-                            <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-neutral-500">
-                              {group && <span>{FOOD_GROUPS[group]} ·</span>}
-                              {onlyInMeal ? (
-                                "trocado só na refeição marcada"
-                              ) : substitute ? (
-                                <>
-                                  substituído por <ArrowRight size={12} />
-                                  <span className="font-medium text-neutral-700">{substitute}</span>
-                                </>
-                              ) : (
-                                "removido das refeições"
-                              )}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setReleasing(name)}
-                            className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
-                          >
-                            <Undo2 size={14} /> Liberar
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </section>
-            );
-          })}
-      </div>
 
       <ConfirmDialog
         open={releasing !== null}
