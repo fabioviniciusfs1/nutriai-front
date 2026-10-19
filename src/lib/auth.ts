@@ -184,3 +184,9 @@ export async function saveProfile(profile: Profile) {
   });
   return me !== null;
 }
+
+/** O peso meta pode mudar depois do cadastro (o resto do perfil, não); `null` tira a meta. */
+export async function saveTargetWeight(targetWeightKg: number | null) {
+  const me = await mutate<Me>("/me/target-weight", "PUT", { targetWeightKg }, { update: ME_PATH });
+  return me !== null;
+}

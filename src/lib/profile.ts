@@ -61,6 +61,8 @@ export type Profile = {
   heightCm: number;
   activityLevel: (typeof ACTIVITY_LEVELS)[number]["id"];
   goal: (typeof GOALS)[number]["id"];
+  /** Peso meta (30–300 kg): obrigatório para perder ou ganhar; `null` com manter. Pode mudar depois do cadastro. */
+  targetWeightKg: number | null;
 };
 
 export type MealSlot = (typeof MEAL_SLOTS)[number]["id"];

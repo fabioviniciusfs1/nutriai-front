@@ -36,6 +36,16 @@ export type Me = {
   google: { email: string; canDisconnect: boolean } | null;
 };
 
+/** Projeção do peso até `profile.targetWeightKg`, comendo a meta calórica. */
+export type WeightProjection = {
+  /** Meses até a meta, com uma casa decimal. */
+  months: number;
+  /** Variação por semana (kg, uma casa decimal; negativa ao perder). */
+  weeklyChangeKg: number;
+  /** Um ponto por mês desde o mês 0 (peso atual); o último é o peso meta, no mês (fracionário) em que chega. */
+  points: { month: number; weightKg: number }[];
+};
+
 export type AuthResponse = { token: string };
 
 /** URL de consentimento do Google para conectar a conta já logada. */
