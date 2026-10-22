@@ -41,7 +41,7 @@ export function MarkedFoods() {
       <div
         role="tablist"
         aria-label="Motivo"
-        className="flex gap-0.5 overflow-x-auto rounded-full bg-neutral-100 p-1 sm:w-fit sm:gap-1"
+        className="flex gap-1.5 overflow-x-auto rounded-full p-1 sm:w-fit sm:gap-2"
       >
         {FOOD_FEEDBACK.map(({ id, label, Icon }) => {
           const selected = tab === id;
@@ -55,12 +55,16 @@ export function MarkedFoods() {
               aria-controls="foods-panel"
               onClick={() => setTab(id)}
               className={`flex w-[calc((100vw-2.5rem-4px)/2.2)] min-w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-2 text-sm font-medium transition-colors sm:w-auto sm:gap-2 sm:px-4 ${
-                selected ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500 hover:text-neutral-700"
+                selected ? "bg-accent text-white" : "bg-accent/15 text-accent hover:bg-accent/25"
               }`}
             >
-              <Icon size={16} className={selected ? "text-neutral-700" : "text-neutral-400"} /> {label}
+              <Icon size={16} /> {label}
               {restricted.data && (
-                <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-600 sm:px-2">
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-xs font-medium sm:px-2 ${
+                    selected ? "bg-white/25 text-white" : "bg-white/70 text-accent"
+                  }`}
+                >
                   {foods.filter((food) => food.feedback === id).length}
                 </span>
               )}
@@ -106,7 +110,7 @@ export function MarkedFoods() {
                   <button
                     type="button"
                     onClick={() => setReleasing(name)}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                    className="flex shrink-0 items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
                   >
                     <Undo2 size={14} /> Liberar
                   </button>

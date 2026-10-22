@@ -66,7 +66,7 @@ export function Topbar() {
             className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               pathname === item.href
                 ? "bg-accent text-white"
-                : "text-neutral-600 hover:bg-neutral-100"
+                : "bg-accent/15 text-accent hover:bg-accent/25"
             }`}
           >
             {item.label}
@@ -93,7 +93,7 @@ export function Topbar() {
                 className={`rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                   pathname === item.href
                     ? "bg-accent text-white"
-                    : "text-neutral-600 hover:bg-neutral-100"
+                    : "bg-accent/15 text-accent hover:bg-accent/25"
                 }`}
               >
                 {item.label}
@@ -148,7 +148,7 @@ export function Topbar() {
                 href={item.href}
                 onClick={() => setUserMenuOpen(false)}
                 className={`rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                  pathname === item.href ? "bg-accent text-white" : "text-neutral-600 hover:bg-neutral-100"
+                  pathname === item.href ? "bg-accent text-white" : "bg-accent/15 text-accent hover:bg-accent/25"
                 }`}
               >
                 {item.label}

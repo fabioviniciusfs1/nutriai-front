@@ -124,7 +124,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               activeTime === item
                 ? "bg-accent text-white"
-                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                : "bg-accent/15 text-accent hover:bg-accent/25"
             }`}
           >
             {item}
@@ -151,19 +151,22 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
                   title="Alterar horário da refeição"
                   aria-label={`Horário da refeição: ${meal.title}, ${meal.time}. Alterar`}
                   onClick={() => setEditingTime({ id: meal.id, title: meal.title, time: meal.time })}
-                  className="flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-200"
+                  className="flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
                 >
                   <Clock size={12} /> {meal.time}
                 </button>
-                <button
-                  type="button"
-                  title="Adicionar alimento"
-                  aria-label={`Adicionar alimento: ${meal.title}`}
-                  onClick={() => setAddingFoodTo(meal.id)}
-                  className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-green-50 hover:text-green-600"
-                >
-                  <PlusCircle size={16} />
-                </button>
+                {/* Na mesma coluna (e do mesmo tamanho) que o botão de substituir de cada alimento. */}
+                <div className="ml-auto flex w-[3.75rem] justify-start">
+                  <button
+                    type="button"
+                    title="Adicionar alimento"
+                    aria-label={`Adicionar alimento: ${meal.title}`}
+                    onClick={() => setAddingFoodTo(meal.id)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
+                  >
+                    <PlusCircle size={15} />
+                  </button>
+                </div>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-500">
                 <span className="flex items-center gap-1">
@@ -218,8 +221,9 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
                         <span className="text-xs text-neutral-400 sm:hidden">Kcal</span>
                         {food.kcal}
                       </span>
-                      {/* No celular, os botões ficam à direita dos nutrientes, na mesma linha. */}
-                      <div className="flex items-center justify-end gap-1 sm:w-[3.75rem] sm:justify-start">
+                      {/* No celular, os botões ficam à direita dos nutrientes, na mesma linha; a coluna tem largura fixa
+                          para o de substituir ficar alinhado em todas as linhas e com o de adicionar alimento. */}
+                      <div className="flex w-[3.75rem] items-center gap-1">
                         <button
                           type="button"
                           title="Substituir alimento"
@@ -227,7 +231,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
                           onClick={() =>
                             setPending({ mealId: meal.id, mealTitle: meal.title, foodName: food.name })
                           }
-                          className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
                         >
                           <ArrowLeftRight size={15} />
                         </button>

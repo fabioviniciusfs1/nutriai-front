@@ -24,7 +24,7 @@ export function HistoryDashboard() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-neutral-900">Histórico</h2>
-        <div role="group" aria-label="Período" className="flex rounded-full bg-white p-1 shadow-sm">
+        <div role="group" aria-label="Período" className="flex gap-2">
           {PERIODS.map((item) => (
             <button
               key={item}
@@ -32,7 +32,7 @@ export function HistoryDashboard() {
               aria-pressed={period === item}
               onClick={() => setPeriod(item)}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                period === item ? "bg-accent text-white" : "text-neutral-600 hover:bg-neutral-100"
+                period === item ? "bg-accent text-white" : "bg-accent/15 text-accent hover:bg-accent/25"
               }`}
             >
               {item} dias
