@@ -143,7 +143,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
           const { totals } = meal;
 
           return (
-            <li key={meal.id} className="rounded-xl border border-neutral-100 p-4">
+            <li key={meal.id} className="rounded-xl border border-neutral-200 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold text-neutral-900">{meal.title}</p>
                 <button
@@ -181,7 +181,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
               </div>
 
               <div className="mt-4">
-                <div className="hidden sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] gap-2 border-b border-neutral-100 pb-2 text-xs font-medium text-neutral-400 sm:grid">
+                <div className="hidden sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] gap-2 border-b border-neutral-200 pb-2 text-xs font-medium text-neutral-400 sm:grid">
                   <span>Alimento</span>
                   <span>Quantidade</span>
                   <span>Carb.</span>
@@ -196,7 +196,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
                     <div
                       // Com substituições, o mesmo alimento pode aparecer duas vezes na refeição.
                       key={`${index}-${food.name}`}
-                      className="grid grid-cols-[repeat(4,minmax(0,1fr))_auto] gap-x-2 gap-y-2 border-b border-neutral-100 py-3 text-sm text-neutral-700 last:border-b-0 sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] sm:items-center sm:border-neutral-50 sm:py-2"
+                      className="grid grid-cols-[repeat(4,minmax(0,1fr))_auto] gap-x-2 gap-y-2 border-b border-neutral-200 py-3 text-sm text-neutral-700 last:border-b-0 sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] sm:items-center sm:py-2"
                     >
                       <span className="col-span-4 font-medium text-neutral-900 sm:col-span-1 sm:font-normal sm:text-neutral-700">
                         {food.name}

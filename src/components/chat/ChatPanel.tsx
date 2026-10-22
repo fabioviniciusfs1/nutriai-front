@@ -40,7 +40,7 @@ export function ChatPanel() {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="flex h-[70vh] flex-col rounded-2xl bg-white p-5 shadow-sm lg:col-span-2">
-        <div className="flex items-center gap-3 border-b border-neutral-100 pb-4">
+        <div className="flex items-center gap-3 border-b border-neutral-200 pb-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-accent">
             <Sparkles size={18} />
           </div>
@@ -110,7 +110,7 @@ export function ChatPanel() {
             event.preventDefault();
             void sendMessage(input);
           }}
-          className="flex items-center gap-2 border-t border-neutral-100 pt-4"
+          className="flex items-center gap-2 border-t border-neutral-200 pt-4"
         >
           <input
             type="text"

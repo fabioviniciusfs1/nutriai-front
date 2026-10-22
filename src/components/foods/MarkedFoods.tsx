@@ -84,7 +84,7 @@ export function MarkedFoods() {
               alimento&rdquo; nos alimentos do plano alimentar.
             </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-neutral-100">
+            <ul className="flex flex-col divide-y divide-neutral-200">
               {marked.map(({ name, group, onlyInMeal, substitute }) => (
                 <li key={name} className="flex items-center gap-3 py-3">
                   <div className="min-w-0 flex-1">

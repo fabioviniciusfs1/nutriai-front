@@ -72,7 +72,7 @@ function MacroDonutCard({ nutrition }: { nutrition: NutritionToday }) {
             </div>
           </div>
 
-          <div className="mt-3 flex w-full items-center gap-2 border-t border-neutral-100 pt-3 text-sm">
+          <div className="mt-3 flex w-full items-center gap-2 border-t border-neutral-200 pt-3 text-sm">
             <Flame size={16} className="text-accent" />
             <span className="text-neutral-700">Calorias gastas</span>
             <span className="ml-auto font-semibold tabular-nums text-neutral-900">
@@ -106,7 +106,7 @@ function MacroDonutCard({ nutrition }: { nutrition: NutritionToday }) {
             )
           )}
 
-          <div className="mt-1 flex items-center gap-2 border-t border-neutral-100 pt-3 text-sm">
+          <div className="mt-1 flex items-center gap-2 border-t border-neutral-200 pt-3 text-sm">
             <GlassWater size={16} className="text-[#7fc1e8]" />
             <span className="text-neutral-700">Água</span>
             <span className="ml-auto font-semibold text-neutral-900">{waterGoal}</span>

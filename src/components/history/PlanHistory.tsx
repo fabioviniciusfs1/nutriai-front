@@ -23,7 +23,7 @@ export function PlanHistory() {
 
           return (
             <li key={plan.date}>
-              <details className="group rounded-xl border border-neutral-100">
+              <details className="group rounded-xl border border-neutral-200">
                 <summary className="flex cursor-pointer list-none items-center gap-4 p-4 [&::-webkit-details-marker]:hidden">
                   <span className="flex flex-1 flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
                     <span className="font-medium text-neutral-900">{formatLongDate(plan.date)}</span>
@@ -42,7 +42,7 @@ export function PlanHistory() {
                   <ChevronDown size={16} className="shrink-0 text-neutral-400 transition-transform group-open:rotate-180" />
                 </summary>
 
-                <div className="border-t border-neutral-100 px-4 pb-4">
+                <div className="border-t border-neutral-200 px-4 pb-4">
                   <ul className="flex flex-col">
                     {plan.meals.map((meal) => (
                       <li

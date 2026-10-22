@@ -341,7 +341,7 @@ export function ProfileForm() {
                 {GOALS.find((item) => item.id === bodyProfile.goal)!.label}
               </p>
 
-              <dl className="mt-5 flex flex-col gap-3 border-t border-neutral-100 pt-4 text-sm">
+              <dl className="mt-5 flex flex-col gap-3 border-t border-neutral-200 pt-4 text-sm">
                 <div className="flex justify-between gap-4">
                   <dt className="text-neutral-500">Taxa metabólica basal</dt>
                   <dd className="font-medium text-neutral-900">{numberFormat.format(estimate.bmr)} kcal</dd>
