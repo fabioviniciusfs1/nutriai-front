@@ -8,7 +8,7 @@ export function NutrientTile({ name, atual, meta, unit, limit }: Nutrient) {
   const overLimit = limit && atual > meta;
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 p-4">
+    <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-medium text-neutral-700">{name}</span>
         <span

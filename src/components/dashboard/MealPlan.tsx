@@ -143,7 +143,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
           const { totals } = meal;
 
           return (
-            <li key={meal.id} className="rounded-xl border border-neutral-200 p-4">
+            <li key={meal.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold text-neutral-900">{meal.title}</p>
                 <button
