@@ -20,14 +20,25 @@ const kgFormat = new Intl.NumberFormat("pt-BR", {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
 });
-const monthFormat = new Intl.NumberFormat("pt-BR", {
+const weightFormat = new Intl.NumberFormat("pt-BR", {
   maximumFractionDigits: 1,
 });
 
 type Point = WeightProjection["points"][number];
 
-function monthLabel(month: number) {
-  return month === 0 ? "Hoje" : `${monthFormat.format(month)} ${month === 1 ? "mês" : "meses"}`;
+/** "AAAA-MM-DD" → "DD/MM/AAAA". */
+function fullDate(date: string) {
+  const [year, month, day] = date.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+/** "14 meses e 21 dias", "1 mês", "21 dias". */
+function durationLabel({ months, days }: WeightProjection["duration"]) {
+  const parts = [
+    months > 0 && `${months} ${months === 1 ? "mês" : "meses"}`,
+    (days > 0 || months === 0) && `${days} ${days === 1 ? "dia" : "dias"}`,
+  ].filter(Boolean);
+  return parts.join(" e ");
 }
 
 function ProjectionTooltip({ active, payload }: TooltipContentProps<ValueType, NameType>) {
@@ -35,7 +46,7 @@ function ProjectionTooltip({ active, payload }: TooltipContentProps<ValueType, N
   const point = payload[0].payload as Point;
   return (
     <div className="rounded-xl bg-neutral-800/95 p-4 text-white shadow-lg">
-      <p className="mb-2 text-xs text-neutral-300">{monthLabel(point.month)}</p>
+      <p className="mb-2 text-xs text-neutral-300">{fullDate(point.date)}</p>
       <div className="flex items-center gap-2 text-sm">
         <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: LINE_COLOR }} />
         <span className="text-neutral-300">Peso estimado</span>
@@ -45,12 +56,17 @@ function ProjectionTooltip({ active, payload }: TooltipContentProps<ValueType, N
   );
 }
 
-/** Marcas do eixo em passos redondos (1, 2 ou 5 kg), com ~4 intervalos e 1 kg de folga. */
+/**
+ * Marcas do eixo começando no menor peso (o peso meta ao perder) e seguindo em passos redondos (1, 2, 5 ou 10 kg),
+ * com ~4 intervalos e 1 kg de folga em cima. Uma marca redonda colada na primeira (menos de meio passo) sai.
+ */
 function weightTicks(min: number, max: number) {
-  const step = [1, 2, 5, 10].find((candidate) => (max - min + 2) / candidate <= 5) ?? 10;
-  const first = Math.floor((min - 1) / step) * step;
+  const step = [1, 2, 5, 10].find((candidate) => (max - min + 1) / candidate <= 5) ?? 10;
   const last = Math.ceil((max + 1) / step) * step;
-  return Array.from({ length: Math.round((last - first) / step) + 1 }, (_, i) => first + i * step);
+  const round: number[] = [];
+  for (let tick = Math.ceil(min / step) * step; tick <= last; tick += step)
+    if (tick - min >= step / 2) round.push(tick);
+  return [min, ...round];
 }
 
 /** Projeção do peso até a meta, calculada pelo backend (`POST /profile/projection`). */
@@ -58,14 +74,18 @@ export function WeightProjectionChart({ projection }: { projection: WeightProjec
   const { points } = projection;
   const target = points[points.length - 1];
   const values = points.map((point) => point.weightKg);
+  // Eixo X só com começo, meio (o mês mais perto da metade do caminho) e fim.
+  const middle = points.reduce((best, point) =>
+    Math.abs(point.month - target.month / 2) < Math.abs(best.month - target.month / 2) ? point : best
+  );
+  const xTicks = [...new Set([0, middle.month, target.month])];
   const yTicks = weightTicks(Math.min(...values), Math.max(...values));
 
   return (
     <>
       <p className="mt-4 text-sm text-neutral-700">
         Você deve chegar a <strong className="font-semibold">{kgFormat.format(target.weightKg)} kg</strong> em cerca de{" "}
-        <strong className="font-semibold">{monthLabel(projection.months)}</strong> (≈{" "}
-        {kgFormat.format(Math.abs(projection.weeklyChangeKg))} kg por semana).
+        <strong className="font-semibold">{durationLabel(projection.duration)}</strong>.
       </p>
 
       <div className="mt-4 h-56">
@@ -76,11 +96,14 @@ export function WeightProjectionChart({ projection }: { projection: WeightProjec
               dataKey="month"
               type="number"
               domain={[0, target.month]}
-              ticks={points.map((point) => point.month)}
+              ticks={xTicks}
               axisLine={false}
               tickLine={false}
               tick={{ fill: "#a3a3a3", fontSize: 12 }}
-              tickFormatter={(value: number) => (value === 0 ? "Hoje" : `${monthFormat.format(value)}m`)}
+              tickFormatter={(value: number) => {
+                const point = points.find((candidate) => candidate.month === value);
+                return point ? fullDate(point.date) : "";
+              }}
               minTickGap={16}
             />
             <YAxis
@@ -89,6 +112,7 @@ export function WeightProjectionChart({ projection }: { projection: WeightProjec
               tick={{ fill: "#a3a3a3", fontSize: 12 }}
               domain={[yTicks[0], yTicks[yTicks.length - 1]]}
               ticks={yTicks}
+              tickFormatter={(value: number) => weightFormat.format(value)}
             />
             <Tooltip content={ProjectionTooltip} cursor={{ stroke: "#d4d4d4" }} />
             <ReferenceLine y={target.weightKg} stroke="#a3a3a3" strokeDasharray="6 4" />
