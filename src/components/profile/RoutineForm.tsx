@@ -33,11 +33,6 @@ type FormTimes = { wakeTime: string; sleepTime: string; trainingStart: string; t
 const busyTimes = (times: FormTimes, trains: boolean | null): BusyTimes =>
   trains ? times : { ...times, trainingStart: null, trainingEnd: null };
 
-const withoutBusy = (hours: number[], times: BusyTimes) => {
-  const busy = unavailableHours(times);
-  return hours.filter((hour) => !busy.includes(hour));
-};
-
 /** Uma hora depois de "HH:MM" (o treino dura uma hora, até a pessoa dizer outra coisa). */
 function oneHourLater(time: string) {
   return `${String((Number(time.slice(0, 2)) + 1) % 24).padStart(2, "0")}:${time.slice(3)}`;
@@ -76,10 +71,14 @@ export function RoutineForm() {
     trainingStart: saved?.trainingStart ?? "18:00",
     trainingEnd: saved?.trainingEnd ?? "19:00",
   });
-  // Horas marcadas (0 a 23), sempre fora do sono e do treino; no cadastro, nenhuma.
-  const [hours, setHours] = useState<number[]>(() =>
-    saved ? withoutBusy(hoursOfWindows(saved.eatingWindows), busyTimes(times, trains)) : []
-  );
+  // Horas (0 a 23) em que a pessoa disse que não pode comer; as outras fora do sono e do treino ficam
+  // disponíveis. No cadastro, nenhuma: todas vêm disponíveis.
+  const [blocked, setBlocked] = useState<number[]>(() => {
+    if (!saved) return [];
+    const busy = unavailableHours(busyTimes(times, trains));
+    const available = hoursOfWindows(saved.eatingWindows);
+    return HOURS.filter((hour) => !busy.includes(hour) && !available.includes(hour));
+  });
   const [meals, setMeals] = useState<MealSlot[]>(saved?.meals ?? []);
   // `null` = ainda sem resposta (só no cadastro); "nenhum" = "Não sinto", salvo como `null`.
   const [hungriest, setHungriest] = useState<HungerAnswer | null>(saved ? (saved.hungriestPeriod ?? "nenhum") : null);
@@ -95,6 +94,7 @@ export function RoutineForm() {
   const [confirming, setConfirming] = useState(false);
 
   const busyHours = unavailableHours(busyTimes(times, trains));
+  const hours = HOURS.filter((hour) => !busyHours.includes(hour) && !blocked.includes(hour));
   const sameTraining = trains === true && times.trainingStart === times.trainingEnd;
   const samePeriod = hungriest !== null && hungriest !== "nenhum" && hungriest === leastHungry;
 
@@ -124,12 +124,11 @@ export function RoutineForm() {
     setPicking({ title, value, onConfirm });
   }
 
-  /** Muda sono ou treino e desmarca as horas para comer que deixaram de valer. */
+  /** Muda sono ou treino; as horas que saem do sono ou do treino voltam disponíveis (se não foram bloqueadas). */
   function changeTimes(change: Partial<FormTimes>, nextTrains = trains) {
     const next = { ...times, ...change };
     setTimes(next);
     setTrains(nextTrains);
-    setHours((current) => withoutBusy(current, busyTimes(next, nextTrains)));
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -248,27 +247,24 @@ export function RoutineForm() {
             </fieldset>
 
             <fieldset className="mt-4" data-invalid={showErrors && hours.length === 0 ? true : undefined}>
-              <legend className="text-sm font-medium text-neutral-700">Horários disponíveis para comer</legend>
-              <p className="text-xs text-neutral-500">
-                Marque os horários do dia em que você consegue fazer uma refeição. O assistente escolhe o horário de
-                cada refeição dentro deles. Cada horário vale a hora inteira (07:00 = das 07:00 às 07:59). Os horários
-                em que você está dormindo ou treinando não aparecem.
-              </p>
+              <legend className="text-sm font-medium text-neutral-700">
+                Toque nos horários em que você não pode comer
+              </legend>
               <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {HOURS.filter((hour) => !busyHours.includes(hour)).map((hour) => {
-                  const checked = hours.includes(hour);
+                  const checked = !blocked.includes(hour);
                   return (
                     <button
                       key={hour}
                       type="button"
                       aria-pressed={checked}
                       onClick={() =>
-                        setHours((current) => (checked ? current.filter((item) => item !== hour) : [...current, hour]))
+                        setBlocked((current) => (checked ? [...current, hour] : current.filter((item) => item !== hour)))
                       }
                       className={`rounded-xl border py-2 text-sm font-medium tabular-nums transition-colors ${
                         checked
                           ? "border-accent bg-accent/5 text-accent"
-                          : "border-neutral-200 text-neutral-700 hover:border-neutral-300"
+                          : "border-neutral-200 text-neutral-400 line-through hover:border-neutral-300"
                       }`}
                     >
                       {hourText(hour)}
@@ -277,7 +273,7 @@ export function RoutineForm() {
                 })}
               </div>
               {showErrors && hours.length === 0 && (
-                <p className="mt-1 text-xs text-red-600">Marque pelo menos um horário</p>
+                <p className="mt-1 text-xs text-red-600">Deixe pelo menos um horário disponível</p>
               )}
             </fieldset>
           </section>
