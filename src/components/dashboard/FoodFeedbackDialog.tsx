@@ -72,8 +72,10 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
       setExhausted(false);
       // Um alimento da lista anterior sai junto com ela; "Sem substituto" continua escolhido.
       setChoice((current) => (current === NO_SUBSTITUTE ? current : null));
-      // Lista nova: volta ao começo ("Ver mais" mantém a posição).
+      // Lista nova: volta ao começo ("Ver mais" mantém a posição). No celular o diálogo inteiro rola: traz a
+      // lista para a tela depois que ela ganha altura.
       listRef.current?.scrollTo({ top: 0 });
+      requestAnimationFrame(() => listRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
     }
     try {
       const found = await apiFetch<PlanFood[]>(path);
@@ -124,9 +126,10 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
       }}
       className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-4xl rounded-2xl bg-white p-0 shadow-xl backdrop:bg-black/40"
     >
-      {/* Coluna: só a lista de substitutos rola; motivos, pesquisa, nota e botões ficam sempre à vista. */}
+      {/* Coluna: só a lista de substitutos rola; motivos, pesquisa e botões ficam sempre à vista. Na tela
+          baixa (celular) a lista não encolhe abaixo de uma altura mínima e o diálogo inteiro rola. */}
       <form
-        className="flex max-h-[inherit] flex-col p-5"
+        className="flex max-h-[inherit] flex-col overflow-y-auto p-5"
         onSubmit={async (event) => {
           event.preventDefault();
           if (!reason || choice === null) return;
@@ -205,7 +208,9 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
 
         <div
           ref={listRef}
-          className="mt-3 max-h-80 min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-neutral-100 p-1"
+          className={`mt-3 max-h-80 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-neutral-100 p-1 ${
+            mode === "none" ? "min-h-0" : "min-h-64"
+          }`}
         >
           <fieldset className="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2">
             <legend className="sr-only">Substituto</legend>
@@ -274,10 +279,6 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
             </div>
           )}
         </div>
-
-        <p className="mt-3 shrink-0 text-xs text-neutral-500">
-          O assistente deixa de recomendar {foodName} até você liberar na página Alimentos.
-        </p>
 
         <div className="mt-5 flex shrink-0 justify-end gap-2">
           <button
