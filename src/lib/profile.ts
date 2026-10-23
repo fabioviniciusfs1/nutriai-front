@@ -108,14 +108,14 @@ export function unavailableHours({ wakeTime, sleepTime, trainingStart, trainingE
 }
 
 /**
- * Janelas das horas marcadas: cada hora vale até a hora cheia seguinte e as vizinhas viram uma janela só
- * (7, 8 e 12 → `07:00–09:00` e `12:00–13:00`). A das 23 termina em `23:59` (o contrato não tem `24:00`).
+ * Janelas das horas marcadas: cada hora vale até o minuto 59 dela (sem encostar na hora seguinte) e as vizinhas
+ * viram uma janela só (7, 8 e 12 → `07:00–08:59` e `12:00–12:59`).
  */
 export function windowsOfHours(hours: number[]): EatingWindow[] {
   const windows: EatingWindow[] = [];
   let previous: number | null = null;
   for (const hour of [...hours].sort((a, b) => a - b)) {
-    const end = hour === 23 ? "23:59" : hourText(hour + 1);
+    const end = `${String(hour).padStart(2, "0")}:59`;
     if (previous === hour - 1) windows[windows.length - 1].end = end;
     else windows.push({ start: hourText(hour), end });
     previous = hour;

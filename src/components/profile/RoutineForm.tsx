@@ -251,9 +251,10 @@ export function RoutineForm() {
               <legend className="text-sm font-medium text-neutral-700">Horários disponíveis para comer</legend>
               <p className="text-xs text-neutral-500">
                 Marque os horários do dia em que você consegue fazer uma refeição. O assistente escolhe o horário de
-                cada refeição dentro deles. Os horários em que você está dormindo ou treinando não aparecem.
+                cada refeição dentro deles. Cada horário vale a hora inteira (07:00 = das 07:00 às 07:59). Os horários
+                em que você está dormindo ou treinando não aparecem.
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {HOURS.filter((hour) => !busyHours.includes(hour)).map((hour) => {
                   const checked = hours.includes(hour);
                   return (
@@ -270,7 +271,7 @@ export function RoutineForm() {
                           : "border-neutral-200 text-neutral-700 hover:border-neutral-300"
                       }`}
                     >
-                      {hourText(hour)} - {hourText(hour + 1)}
+                      {hourText(hour)}
                     </button>
                   );
                 })}
