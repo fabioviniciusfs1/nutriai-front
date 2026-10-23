@@ -98,8 +98,8 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
     if (pending && (await swapFood(pending.mealId, pending.foodName, reason, substitute))) setPending(null);
   }
 
-  async function confirmAddFood(foodName: string) {
-    if (addingFoodTo !== null && (await addFood(addingFoodTo, foodName))) setAddingFoodTo(null);
+  async function confirmAddFood(foodName: string, grams: number) {
+    if (addingFoodTo !== null && (await addFood(addingFoodTo, foodName, grams))) setAddingFoodTo(null);
   }
 
   async function confirmTime(value: string) {
@@ -159,8 +159,8 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
                 <div className="ml-auto flex w-[3.75rem] justify-start">
                   <button
                     type="button"
-                    title="Adicionar alimento"
-                    aria-label={`Adicionar alimento: ${meal.title}`}
+                    title="Adicionar alimento extra"
+                    aria-label={`Adicionar alimento extra: ${meal.title}`}
                     onClick={() => setAddingFoodTo(meal.id)}
                     className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
                   >
@@ -241,7 +241,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
                             title="Remover alimento"
                             aria-label={`Remover alimento: ${food.name}`}
                             onClick={() => void removeExtraFood(meal.id, extraId)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
                           >
                             <Trash2 size={15} />
                           </button>
@@ -266,7 +266,6 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
 
       <AddFoodDialog
         mealId={addingFoodMeal?.id ?? null}
-        mealTitle={addingFoodMeal?.title ?? ""}
         onConfirm={confirmAddFood}
         onCancel={() => setAddingFoodTo(null)}
       />

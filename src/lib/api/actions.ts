@@ -29,8 +29,9 @@ export function personalizePlan() {
   return planMutation("/plan/personalize", "POST");
 }
 
-export function addFood(mealId: number, foodName: string) {
-  return planMutation(`/plan/meals/${mealId}/foods`, "POST", { foodName });
+/** Alimento extra: `grams` gramas fixas, que somam às calorias do dia. */
+export function addFood(mealId: number, foodName: string, grams: number) {
+  return planMutation(`/plan/meals/${mealId}/foods`, "POST", { foodName, grams });
 }
 
 export function removeExtraFood(mealId: number, extraId: string) {
