@@ -28,6 +28,7 @@ type FoodFeedbackDialogProps = {
 export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onCancel }: FoodFeedbackDialogProps) {
   const open = mealId !== null;
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [reason, setReason] = useState<FoodFeedback | null>(null);
   const [choice, setChoice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -71,6 +72,8 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
       setExhausted(false);
       // Um alimento da lista anterior sai junto com ela; "Sem substituto" continua escolhido.
       setChoice((current) => (current === NO_SUBSTITUTE ? current : null));
+      // Lista nova: volta ao começo ("Ver mais" mantém a posição).
+      listRef.current?.scrollTo({ top: 0 });
     }
     try {
       const found = await apiFetch<PlanFood[]>(path);
@@ -119,10 +122,11 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
       onClick={(event) => {
         if (event.target === event.currentTarget) onCancel();
       }}
-      className="m-auto w-[calc(100%-2rem)] max-w-4xl rounded-2xl bg-white p-0 shadow-xl backdrop:bg-black/40"
+      className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-4xl rounded-2xl bg-white p-0 shadow-xl backdrop:bg-black/40"
     >
+      {/* Coluna: só a lista de substitutos rola; motivos, pesquisa, nota e botões ficam sempre à vista. */}
       <form
-        className="p-5"
+        className="flex max-h-[inherit] flex-col p-5"
         onSubmit={async (event) => {
           event.preventDefault();
           if (!reason || choice === null) return;
@@ -131,10 +135,10 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
           setSubmitting(false);
         }}
       >
-        <h4 className="font-semibold text-neutral-900">Substituir alimento?</h4>
-        <p className="mt-1 text-sm text-neutral-600">Por que trocar &ldquo;{foodName}&rdquo;?</p>
+        <h4 className="shrink-0 font-semibold text-neutral-900">Substituir alimento?</h4>
+        <p className="mt-1 shrink-0 text-sm text-neutral-600">Por que trocar &ldquo;{foodName}&rdquo;?</p>
 
-        <fieldset className="mt-4 grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2">
+        <fieldset className="mt-4 grid min-w-0 shrink-0 grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2">
           <legend className="sr-only">Motivo da troca</legend>
           {FOOD_FEEDBACK.map(({ id, label, Icon }) => (
             <label
@@ -161,11 +165,11 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
           ))}
         </fieldset>
 
-        <p className="mt-5 text-sm font-medium text-neutral-900">Substituir por</p>
-        <p className="mt-0.5 text-xs text-neutral-500">
+        <p className="mt-5 shrink-0 text-sm font-medium text-neutral-900">Substituir por</p>
+        <p className="mt-0.5 shrink-0 text-xs text-neutral-500">
           Pesquise o alimento que você quer ou peça uma sugestão. A porção fica com as mesmas calorias.
         </p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 flex shrink-0 flex-wrap gap-2">
           <input
             type="text"
             autoComplete="off"
@@ -180,7 +184,7 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
             }}
             placeholder="Pesquisar alimento…"
             aria-label="Pesquisar alimento"
-            className="min-w-0 flex-1 basis-48 rounded-xl bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-accent"
+            className="min-w-0 flex-1 basis-48 rounded-xl bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 outline-none ring-2 ring-accent"
           />
           <button
             type="button"
@@ -199,26 +203,30 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
           </button>
         </div>
 
-        <fieldset className="mt-3 grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2">
-          <legend className="sr-only">Substituto</legend>
-          <label
-            className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${
-              choice === NO_SUBSTITUTE ? "border-accent bg-accent/5" : "border-neutral-200 hover:bg-neutral-50"
-            }`}
-          >
-            <input
-              type="radio"
-              name="food-substitute"
-              value={NO_SUBSTITUTE}
-              checked={choice === NO_SUBSTITUTE}
-              onChange={() => setChoice(NO_SUBSTITUTE)}
-              className="h-4 w-4 shrink-0 accent-accent"
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-neutral-900">Sem substituto</span>
-              <span className="mt-0.5 block text-xs text-neutral-500">O alimento sai sem outro no lugar.</span>
-            </span>
-          </label>
+        <div
+          ref={listRef}
+          className="mt-3 max-h-80 min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-neutral-100 p-1"
+        >
+          <fieldset className="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2">
+            <legend className="sr-only">Substituto</legend>
+            <label
+              className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${
+                choice === NO_SUBSTITUTE ? "border-accent bg-accent/5" : "border-neutral-200 hover:bg-neutral-50"
+              }`}
+            >
+              <input
+                type="radio"
+                name="food-substitute"
+                value={NO_SUBSTITUTE}
+                checked={choice === NO_SUBSTITUTE}
+                onChange={() => setChoice(NO_SUBSTITUTE)}
+                className="h-4 w-4 shrink-0 accent-accent"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-neutral-900">Sem substituto</span>
+                <span className="mt-0.5 block text-xs text-neutral-500">O alimento sai sem outro no lugar.</span>
+              </span>
+            </label>
             {options.map((option) => (
               <label
                 key={option.name}
@@ -248,29 +256,30 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
             ))}
           </fieldset>
 
-        {mode !== "none" && (
-          <div className="mt-3 flex min-h-6 flex-col items-center gap-1 text-center">
-            {loading ? (
-              <Spinner className="h-5 w-5" />
-            ) : canLoadMore ? (
-              <button type="button" onClick={loadMore} className="text-sm font-medium text-accent hover:underline">
-                Ver mais
-              </button>
-            ) : exhausted ? (
-              <p className="text-sm text-neutral-500">Não há mais opções.</p>
-            ) : (
-              !error &&
-              options.length === 0 && <p className="text-sm text-neutral-500">Nenhum alimento encontrado.</p>
-            )}
-            {error && <p className="text-sm text-neutral-600">{error}</p>}
-          </div>
-        )}
+          {mode !== "none" && (
+            <div className="mt-3 flex min-h-6 flex-col items-center gap-1 text-center">
+              {loading ? (
+                <Spinner className="h-5 w-5" />
+              ) : canLoadMore ? (
+                <button type="button" onClick={loadMore} className="text-sm font-medium text-accent hover:underline">
+                  Ver mais
+                </button>
+              ) : exhausted ? (
+                <p className="text-sm text-neutral-500">Não há mais opções.</p>
+              ) : (
+                !error &&
+                options.length === 0 && <p className="text-sm text-neutral-500">Nenhum alimento encontrado.</p>
+              )}
+              {error && <p className="text-sm text-neutral-600">{error}</p>}
+            </div>
+          )}
+        </div>
 
-        <p className="mt-3 text-xs text-neutral-500">
+        <p className="mt-3 shrink-0 text-xs text-neutral-500">
           O assistente deixa de recomendar {foodName} até você liberar na página Alimentos.
         </p>
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex shrink-0 justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
