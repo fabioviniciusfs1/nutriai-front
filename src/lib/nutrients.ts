@@ -10,6 +10,9 @@ export const MACRO_COLORS: Record<MacroId, string> = {
 /** Ordem dos macros no card "Meta diária". */
 export const MACRO_ORDER: MacroId[] = ["proteinas", "carboidratos", "gorduras"];
 
+/** Cor das calorias no card "Meta diária" (diferente da de proteínas, que usa a cor de destaque). */
+export const CALORIE_COLOR = "#f2a541";
+
 /** Cor das fibras no card "Meta diária". */
 export const FIBER_COLOR = "#8cc084";
 
