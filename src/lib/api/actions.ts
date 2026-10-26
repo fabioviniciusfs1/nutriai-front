@@ -4,6 +4,7 @@ import { mutate } from "@/lib/api/query";
 import type {
   DietAdjustment,
   DietEstimateRequest,
+  DietPreview,
   DietSettings,
   RestrictedFood,
   TodayPlan,
@@ -70,6 +71,11 @@ export function addWeightEntry(kg: number, at: Date) {
 /** Prévia do ajuste da dieta com a mudança de um macro (e a compensação feita pelo backend), sem salvar. */
 export function estimateDiet(request: DietEstimateRequest) {
   return mutate<DietAdjustment>(`${DIET_PATH}/estimate`, "POST", request);
+}
+
+/** O plano de hoje com o ajuste, sem salvar ("Ver prévia"). */
+export function previewDiet(settings: DietSettings) {
+  return mutate<DietPreview>(`${DIET_PATH}/preview`, "POST", settings);
 }
 
 /** Salva o ajuste da dieta: as metas, as porções do plano e o histórico mudam. */
