@@ -14,6 +14,8 @@ type TimePickerDialogProps = {
   title: string;
   /** "HH:MM" */
   value: string;
+  /** Conferindo o horário antes de salvar: o botão fica desabilitado. */
+  busy?: boolean;
   onConfirm: (value: string) => void;
   onCancel: () => void;
 };
@@ -151,7 +153,7 @@ export function TimeFields({
   );
 }
 
-export function TimePickerDialog({ open, title, value, onConfirm, onCancel }: TimePickerDialogProps) {
+export function TimePickerDialog({ open, title, value, busy = false, onConfirm, onCancel }: TimePickerDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [hours, setHours] = useState("00");
   const [minutes, setMinutes] = useState("00");
@@ -169,6 +171,7 @@ export function TimePickerDialog({ open, title, value, onConfirm, onCancel }: Ti
   }, [open, value]);
 
   function confirm() {
+    if (busy) return;
     onConfirm(toTimeValue(hours, minutes));
   }
 
@@ -208,9 +211,10 @@ export function TimePickerDialog({ open, title, value, onConfirm, onCancel }: Ti
           <button
             type="submit"
             autoFocus
-            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+            disabled={busy}
+            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
           >
-            Definir
+            {busy ? "Conferindo…" : "Definir"}
           </button>
         </div>
       </form>

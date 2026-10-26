@@ -6,6 +6,7 @@ import type {
   DietEstimateRequest,
   DietPreview,
   DietSettings,
+  MealTimeCheck,
   RestrictedFood,
   TodayPlan,
   WeightEntry,
@@ -27,6 +28,11 @@ function planMutation(path: string, method: string, body?: unknown, alsoInvalida
     update: TODAY_PLAN_PATH,
     invalidate: ["/plan/meals/", "/nutrition", "/history", ...alsoInvalidate],
   });
+}
+
+/** O que o assistente acha do novo horário, sem salvar: `ok` = pode salvar direto. */
+export function checkMealTime(mealId: number, time: string) {
+  return mutate<MealTimeCheck>(`/plan/meals/${mealId}/time-check`, "POST", { time });
 }
 
 export function changeMealTime(mealId: number, time: string) {

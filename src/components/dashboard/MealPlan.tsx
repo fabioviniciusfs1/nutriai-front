@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { ArrowLeftRight, Clock, Flame, Wheat, Drumstick, Droplet, PlusCircle, Trash2 } from "lucide-react";
 import type { FoodFeedback } from "@/lib/food-feedback";
 import type { TodayPlan } from "@/lib/api/types";
-import { mealSlotLabel } from "@/lib/profile";
+import { mealSlotLabel, type MealSlot } from "@/lib/profile";
 import { invalidate, useApiQuery } from "@/lib/api/query";
 import {
   addFood,
   changeMealTime,
+  checkMealTime,
   personalizePlan,
   removeExtraFood,
   swapFood,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/api/actions";
 import { QueryStatus, Spinner } from "@/components/api/QueryStatus";
 import { FoodFeedbackDialog } from "@/components/dashboard/FoodFeedbackDialog";
+import { MealTimeAdviceDialog } from "@/components/dashboard/MealTimeAdviceDialog";
 import { TimePickerDialog } from "@/components/dashboard/TimePickerDialog";
 import { AddFoodDialog } from "@/components/dashboard/AddFoodDialog";
 
@@ -81,9 +83,18 @@ function PersonalizationNotice({ personalization }: { personalization: TodayPlan
   );
 }
 
+/** Refeição cujo horário está sendo mudado. */
+type EditingTime = { id: number; slot: MealSlot; title: string; time: string };
+
 function MealPlanView({ plan }: { plan: TodayPlan }) {
   const [time, setTime] = useState("Todos");
-  const [editingTime, setEditingTime] = useState<{ id: number; title: string; time: string } | null>(null);
+  const [editingTime, setEditingTime] = useState<EditingTime | null>(null);
+  // Conferindo o novo horário com o assistente antes de salvar.
+  const [checkingTime, setCheckingTime] = useState(false);
+  // Aviso do assistente sobre o horário escolhido (`time`): o usuário mantém ou muda para o sugerido.
+  const [timeAdvice, setTimeAdvice] = useState<
+    (EditingTime & { chosen: string; message: string; suggestedTime: string | null }) | null
+  >(null);
   const [addingFoodTo, setAddingFoodTo] = useState<number | null>(null);
   const [pending, setPending] = useState<{ mealId: number; mealTitle: string; foodName: string } | null>(null);
 
@@ -103,13 +114,32 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
     if (addingFoodTo !== null && (await addFood(addingFoodTo, foodName, grams))) setAddingFoodTo(null);
   }
 
+  async function saveTime(meal: EditingTime, value: string) {
+    const saved = await changeMealTime(meal.id, value);
+    // O filtro ativo segue a refeição para o novo horário.
+    if (saved && time === meal.time) setTime(value);
+    return saved !== null;
+  }
+
   async function confirmTime(value: string) {
     if (!editingTime) return;
-    if (await changeMealTime(editingTime.id, value)) {
-      // O filtro ativo segue a refeição para o novo horário.
-      if (time === editingTime.time) setTime(value);
+    setCheckingTime(true);
+    // Se a conferência falhar (rede), salva direto: ela nunca impede a troca.
+    const check = await checkMealTime(editingTime.id, value);
+    setCheckingTime(false);
+    if (check && !check.ok && check.message) {
+      setTimeAdvice({ ...editingTime, chosen: value, message: check.message, suggestedTime: check.suggestedTime });
       setEditingTime(null);
+      return;
     }
+    if (await saveTime(editingTime, value)) setEditingTime(null);
+  }
+
+  async function chooseTime(value: string) {
+    if (!timeAdvice) return;
+    setCheckingTime(true);
+    if (await saveTime(timeAdvice, value)) setTimeAdvice(null);
+    setCheckingTime(false);
   }
 
   return (
@@ -154,7 +184,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
                   type="button"
                   title="Alterar horário da refeição"
                   aria-label={`Horário da refeição: ${meal.title}, ${meal.time}. Alterar`}
-                  onClick={() => setEditingTime({ id: meal.id, title: meal.title, time: meal.time })}
+                  onClick={() => setEditingTime({ id: meal.id, slot: meal.slot, title: meal.title, time: meal.time })}
                   className="flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
                 >
                   <Clock size={12} /> {meal.time}
@@ -274,8 +304,20 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
         open={editingTime !== null}
         title={`Horário: ${editingTime?.title ?? ""}`}
         value={editingTime?.time ?? "00:00"}
+        busy={checkingTime}
         onConfirm={confirmTime}
         onCancel={() => setEditingTime(null)}
+      />
+
+      <MealTimeAdviceDialog
+        open={timeAdvice !== null}
+        title={timeAdvice ? `${mealSlotLabel(timeAdvice.slot)} às ${timeAdvice.chosen}?` : ""}
+        message={timeAdvice?.message ?? ""}
+        time={timeAdvice?.chosen ?? ""}
+        suggestedTime={timeAdvice?.suggestedTime ?? null}
+        busy={checkingTime}
+        onChoose={chooseTime}
+        onCancel={() => setTimeAdvice(null)}
       />
 
       <AddFoodDialog
