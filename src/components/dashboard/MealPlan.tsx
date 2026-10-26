@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeftRight, Clock, Flame, Wheat, Drumstick, Droplet, PlusCircle, Trash2 } from "lucide-react";
 import type { FoodFeedback } from "@/lib/food-feedback";
 import type { TodayPlan } from "@/lib/api/types";
+import { mealSlotLabel } from "@/lib/profile";
 import { invalidate, useApiQuery } from "@/lib/api/query";
 import {
   addFood,
@@ -145,7 +146,10 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
           return (
             <li key={meal.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold text-neutral-900">{meal.title}</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-accent">{mealSlotLabel(meal.slot)}</p>
+                  <p className="font-semibold text-neutral-900">{meal.title}</p>
+                </div>
                 <button
                   type="button"
                   title="Alterar horário da refeição"

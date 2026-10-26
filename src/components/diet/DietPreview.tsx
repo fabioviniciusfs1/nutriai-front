@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { DietPreview as DietPreviewData, PlanHistoryChange } from "@/lib/api/types";
 import { numberFormat } from "@/components/history/format";
 import { amount, changeText } from "@/components/history/plan-format";
+import { mealSlotLabel } from "@/lib/profile";
 import { CALORIE_COLOR, FIBER_COLOR, MACRO_COLORS } from "@/lib/nutrients";
 
 type DietPreviewProps = {
@@ -79,7 +80,9 @@ export function DietPreview({ preview, busy, onBack, onApprove }: DietPreviewPro
         {preview.meals.map((meal, index) => (
           <li key={index} className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm">
             <div className="flex items-baseline gap-3">
-              <span className="text-xs text-neutral-400">{meal.time}</span>
+              <span className="shrink-0 text-xs text-neutral-400">
+                {mealSlotLabel(meal.slot)} · {meal.time}
+              </span>
               <span className="flex-1 font-medium text-neutral-800">{meal.title}</span>
               <span className="text-neutral-500">{meal.kcal} kcal</span>
             </div>

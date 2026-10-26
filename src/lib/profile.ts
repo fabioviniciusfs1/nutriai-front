@@ -66,6 +66,11 @@ export type Profile = {
 };
 
 export type MealSlot = (typeof MEAL_SLOTS)[number]["id"];
+
+/** Nome da refeição do dia ("Almoço"), mostrado acima ou ao lado do título. */
+export function mealSlotLabel(slot: MealSlot) {
+  return MEAL_SLOTS.find((item) => item.id === slot)!.label;
+}
 export type DayPeriod = (typeof DAY_PERIODS)[number]["id"];
 
 /** Janela em que dá para comer, "HH:MM". */
