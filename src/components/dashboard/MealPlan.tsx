@@ -93,7 +93,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
   const [checkingTime, setCheckingTime] = useState(false);
   // Aviso do assistente sobre o horário escolhido (`time`): o usuário mantém ou muda para o sugerido.
   const [timeAdvice, setTimeAdvice] = useState<
-    (EditingTime & { chosen: string; message: string; suggestedTime: string | null }) | null
+    (EditingTime & { chosen: string; message: string; suggestedTime: string | null; canKeep: boolean }) | null
   >(null);
   const [addingFoodTo, setAddingFoodTo] = useState<number | null>(null);
   const [pending, setPending] = useState<{ mealId: number; mealTitle: string; foodName: string } | null>(null);
@@ -128,7 +128,13 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
     const check = await checkMealTime(editingTime.id, value);
     setCheckingTime(false);
     if (check && !check.ok && check.message) {
-      setTimeAdvice({ ...editingTime, chosen: value, message: check.message, suggestedTime: check.suggestedTime });
+      setTimeAdvice({
+        ...editingTime,
+        chosen: value,
+        message: check.message,
+        suggestedTime: check.suggestedTime,
+        canKeep: check.canKeep,
+      });
       setEditingTime(null);
       return;
     }
@@ -315,6 +321,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
         message={timeAdvice?.message ?? ""}
         time={timeAdvice?.chosen ?? ""}
         suggestedTime={timeAdvice?.suggestedTime ?? null}
+        canKeep={timeAdvice?.canKeep ?? true}
         busy={checkingTime}
         onChoose={chooseTime}
         onCancel={() => setTimeAdvice(null)}

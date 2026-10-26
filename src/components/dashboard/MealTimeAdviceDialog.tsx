@@ -5,24 +5,27 @@ import { useEffect, useRef } from "react";
 type MealTimeAdviceDialogProps = {
   open: boolean;
   title: string;
-  /** Explicação do assistente sobre o horário escolhido. */
+  /** Por que o horário escolhido não é bom (do assistente ou da regra da rotina). */
   message: string;
   /** "HH:MM" escolhido pelo usuário. */
   time: string;
-  /** "HH:MM" sugerido pelo assistente; `null` = só manter ou cancelar. */
+  /** "HH:MM" sugerido no lugar; `null` = sem sugestão. */
   suggestedTime: string | null;
+  /** `false` quando a rotina não deixa comer no horário escolhido: sem "Manter". */
+  canKeep: boolean;
   busy: boolean;
   onChoose: (time: string) => void;
   onCancel: () => void;
 };
 
-/** Aviso do assistente sobre o novo horário: manter o escolhido ou mudar para o sugerido. */
+/** Aviso sobre o novo horário: manter o escolhido (quando a rotina deixa) ou mudar para o sugerido. */
 export function MealTimeAdviceDialog({
   open,
   title,
   message,
   time,
   suggestedTime,
+  canKeep,
   busy,
   onChoose,
   onCancel,
@@ -61,18 +64,20 @@ export function MealTimeAdviceDialog({
           >
             Cancelar
           </button>
-          <button
-            type="button"
-            onClick={() => onChoose(time)}
-            disabled={busy}
-            className={
-              suggestedTime
-                ? "rounded-full bg-accent/15 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/25 disabled:opacity-60"
-                : "rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-            }
-          >
-            Manter {time}
-          </button>
+          {canKeep && (
+            <button
+              type="button"
+              onClick={() => onChoose(time)}
+              disabled={busy}
+              className={
+                suggestedTime
+                  ? "rounded-full bg-accent/15 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/25 disabled:opacity-60"
+                  : "rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+              }
+            >
+              Manter {time}
+            </button>
+          )}
           {suggestedTime && (
             <button
               type="button"
