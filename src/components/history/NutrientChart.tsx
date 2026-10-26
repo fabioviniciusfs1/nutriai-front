@@ -185,7 +185,8 @@ function NutrientChartCard({ history, selector }: { history: NutrientHistory; se
               dataKey="value"
               stroke={LINE_COLOR}
               strokeWidth={2}
-              dot={false}
+              // Com poucos dias (conta nova), a linha sozinha quase não aparece: mostra os pontos.
+              dot={data.length <= 7 ? { r: 3, fill: LINE_COLOR, strokeWidth: 0 } : false}
               activeDot={{ r: 4, stroke: "#fff", strokeWidth: 2 }}
               isAnimationActive={false}
             />
