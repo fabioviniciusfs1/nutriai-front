@@ -20,6 +20,7 @@ const USER_ITEMS: { label: string; href: string }[] = [
   { label: "Perfil", href: "/perfil" },
   { label: "Rotina", href: "/rotina" },
   { label: "Conexão Google Health", href: "/google-health" },
+  { label: "Ajuste da dieta", href: "/ajuste-dieta" },
 ];
 
 export function Topbar() {

@@ -1,13 +1,21 @@
 // Alterações do plano, dos alimentos e dos pesos. O backend aplica as regras e devolve o
 // resultado já calculado; o front só atualiza o cache. Cada função devolve `null` se falhou.
 import { mutate } from "@/lib/api/query";
-import type { RestrictedFood, TodayPlan, WeightEntry } from "@/lib/api/types";
+import type {
+  DietAdjustment,
+  DietEstimateRequest,
+  DietSettings,
+  RestrictedFood,
+  TodayPlan,
+  WeightEntry,
+} from "@/lib/api/types";
 import type { FoodFeedback } from "@/lib/food-feedback";
 import { ME_PATH } from "@/lib/auth";
 
 export const TODAY_PLAN_PATH = "/plan/today";
 export const RESTRICTED_FOODS_PATH = "/foods/restricted";
 export const WEIGHTS_PATH = "/weights";
+export const DIET_PATH = "/me/diet";
 
 /**
  * Toda mudança no plano: o plano de hoje vem na resposta; as prévias por refeição, o consumo de hoje
@@ -56,5 +64,18 @@ export function addWeightEntry(kg: number, at: Date) {
   return mutate<WeightEntry[]>(WEIGHTS_PATH, "POST", { kg, at: at.toISOString() }, {
     update: WEIGHTS_PATH,
     invalidate: [ME_PATH],
+  });
+}
+
+/** Prévia do ajuste da dieta com a mudança de um macro (e a compensação feita pelo backend), sem salvar. */
+export function estimateDiet(request: DietEstimateRequest) {
+  return mutate<DietAdjustment>(`${DIET_PATH}/estimate`, "POST", request);
+}
+
+/** Salva o ajuste da dieta: as metas, as porções do plano e o histórico mudam. */
+export function saveDiet(settings: DietSettings) {
+  return mutate<DietAdjustment>(DIET_PATH, "PUT", settings, {
+    update: DIET_PATH,
+    invalidate: ["/plan", "/nutrition", "/history"],
   });
 }
