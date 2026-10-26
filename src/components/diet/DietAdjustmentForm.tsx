@@ -15,13 +15,6 @@ const MACRO_NAMES: Record<MacroId, string> = {
   gorduras: "Gorduras",
 };
 
-/** O que cada macro compensa quando muda (a regra é do backend; aqui só o texto). */
-const MACRO_HINTS: Record<MacroId, string> = {
-  proteinas: "Mínimo de 1,6 g/kg. Menos proteína, mais carboidrato.",
-  gorduras: "Mínimo de 0,5 g/kg. Menos gordura, mais carboidrato.",
-  carboidratos: "O restante das calorias. Menos carboidrato, mais gordura.",
-};
-
 /** Passo dos botões − e + (g/kg). */
 const STEP = 0.1;
 
@@ -84,10 +77,6 @@ export function DietAdjustmentForm() {
       <div className="flex flex-col gap-4 lg:col-span-2">
         <section className="rounded-2xl bg-white p-5 shadow-sm">
           <h3 className="font-semibold text-neutral-900">Macronutrientes</h3>
-          <p className="mt-1 text-sm text-neutral-500">
-            As calorias do dia continuam em {numberFormat.format(current.calories)} kcal: o que você tira de um
-            macronutriente vai para outro.
-          </p>
           <ul className="mt-4 flex flex-col divide-y divide-neutral-100">
             {MACRO_ORDER.map((macro) => (
               <li key={macro} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center">
@@ -96,7 +85,6 @@ export function DietAdjustmentForm() {
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: MACRO_COLORS[macro] }} />
                     <span className="font-medium text-neutral-900">{MACRO_NAMES[macro]}</span>
                   </div>
-                  <p className="mt-1 text-xs text-neutral-500">{MACRO_HINTS[macro]}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
@@ -134,16 +122,11 @@ export function DietAdjustmentForm() {
         {usesEgg && (
           <section className="rounded-2xl bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
                   <Egg size={20} />
                 </span>
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-neutral-900">Peso da unidade do ovo</h3>
-                  <p className="text-sm text-neutral-500">
-                    Os ovos do seu plano vão em unidades inteiras desse peso (de 30 a 90 g).
-                  </p>
-                </div>
+                <h3 className="min-w-0 font-semibold text-neutral-900">Peso da unidade do ovo</h3>
               </div>
               <label className="flex items-center gap-2 text-sm text-neutral-700">
                 <span className="sr-only">Peso da unidade do ovo em gramas</span>
@@ -158,7 +141,7 @@ export function DietAdjustmentForm() {
                     setSavedMessage(false);
                     setEggText(event.target.value);
                   }}
-                  className="w-20 rounded-xl border border-neutral-200 px-3 py-2 text-right tabular-nums focus:border-accent focus:outline-none"
+                  className="w-20 rounded-xl border border-neutral-200 px-3 py-2 text-right tabular-nums focus:border-accent focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 g
               </label>

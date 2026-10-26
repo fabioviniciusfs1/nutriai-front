@@ -205,9 +205,10 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
                         {food.name}
                       </span>
                       <span className="text-right text-neutral-500 sm:text-left">
-                        {food.units !== undefined &&
-                          `${food.units} ${food.units === 1 ? "unidade" : "unidades"} · `}
-                        {food.grams} g
+                        {/* Ovo: `grams` = unidades × peso da unidade. */}
+                        {food.units !== undefined
+                          ? `${food.units} un. de ${food.grams / food.units}g`
+                          : `${food.grams} g`}
                       </span>
                       <span className="flex flex-col sm:block">
                         <span className="text-xs text-neutral-400 sm:hidden">Carb.</span>
