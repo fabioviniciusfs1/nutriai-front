@@ -140,6 +140,9 @@ export function AddFoodDialog({ mealId, onConfirm, onCancel }: AddFoodDialogProp
         }}
       >
         <h4 className="shrink-0 font-semibold text-neutral-900">Adicionar alimento extra</h4>
+        <p className="mt-1 shrink-0 text-sm text-neutral-500">
+          Vale só para hoje. Se comer de novo amanhã, adicione outra vez.
+        </p>
 
         <label className="sr-only" htmlFor="add-food-name">
           Alimento
