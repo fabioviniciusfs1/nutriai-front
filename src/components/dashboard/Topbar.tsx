@@ -6,6 +6,7 @@ import { useState } from "react";
 import { LogOut, Menu, X } from "lucide-react";
 import { getInitials, signOut, useAuth } from "@/lib/auth";
 import { CHAT_ENABLED } from "@/lib/features";
+import { useNotifications } from "@/lib/notifications";
 
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "Início", href: "/" },
@@ -15,8 +16,11 @@ const NAV_ITEMS: { label: string; href: string }[] = [
   ...(CHAT_ENABLED ? [{ label: "Chat com IA", href: "/chat" }] : []),
 ];
 
+const NOTIFICATIONS_HREF = "/notificacoes";
+
 /** Páginas do card que abre ao clicar no nome. */
 const USER_ITEMS: { label: string; href: string }[] = [
+  { label: "Notificações", href: NOTIFICATIONS_HREF },
   { label: "Perfil", href: "/perfil" },
   { label: "Rotina", href: "/rotina" },
   { label: "Conexão Google Health", href: "/google-health" },
@@ -29,6 +33,7 @@ export function Topbar() {
   const name = useAuth()?.user?.name ?? "";
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const pending = useNotifications().length;
   const onUserPage = USER_ITEMS.some((item) => item.href === pathname);
 
   function handleSignOut() {
@@ -109,6 +114,7 @@ export function Topbar() {
           type="button"
           onClick={() => setUserMenuOpen((open) => !open)}
           title="Minha conta"
+          aria-label={pending > 0 ? `Minha conta, ${pending} ${pending === 1 ? "notificação" : "notificações"}` : undefined}
           aria-expanded={userMenuOpen}
           aria-controls="topbar-user-menu"
           className={`flex items-center gap-2 rounded-full p-1 pr-1 transition-colors hover:bg-neutral-100 sm:pr-3 ${
@@ -117,9 +123,15 @@ export function Topbar() {
         >
           <span
             aria-hidden
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white"
           >
             {getInitials(name)}
+            {pending > 0 && (
+              // Pulando para chamar atenção, até a notificação ser resolvida.
+              <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 animate-bounce items-center justify-center rounded-full border-2 border-white bg-red-500 px-1 text-[10px] font-bold leading-none text-white motion-reduce:animate-none">
+                {pending}
+              </span>
+            )}
           </span>
           <span className="hidden text-sm font-semibold sm:block">{name}</span>
           <span className="sr-only sm:hidden">Minha conta</span>
@@ -148,11 +160,16 @@ export function Topbar() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setUserMenuOpen(false)}
-                className={`rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                   pathname === item.href ? "bg-accent text-white" : "bg-accent/15 text-accent hover:bg-accent/25"
                 }`}
               >
                 {item.label}
+                {item.href === NOTIFICATIONS_HREF && pending > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold leading-none text-white">
+                    {pending}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
