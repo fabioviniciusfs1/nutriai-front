@@ -80,7 +80,7 @@ export function CalorieAdjustmentCard() {
         type="button"
         onClick={() => press(direction)}
         disabled={busy || (decrease && atFloor)}
-        className="flex items-center gap-1.5 rounded-full bg-accent/15 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40"
+        className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-40"
       >
         {decrease ? <Minus size={16} /> : <Plus size={16} />}
         {decrease ? "Diminuir" : "Aumentar"} 10% ({numberFormat.format(to)} kcal)
@@ -170,14 +170,14 @@ export function CalorieAdjustmentCard() {
               type="button"
               onClick={() => void apply(confirming)}
               disabled={busy}
-              className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+              className="rounded-full px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 disabled:opacity-60"
             >
               {confirming === "decrease" ? "Diminuir" : "Aumentar"} mesmo assim
             </button>
             <button
               type="button"
               onClick={() => setConfirming(null)}
-              className="rounded-full px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100"
+              className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
             >
               Cancelar
             </button>
