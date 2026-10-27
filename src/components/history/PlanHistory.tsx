@@ -1,13 +1,17 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useApiQuery } from "@/lib/api/query";
-import type { PlanHistoryEntry } from "@/lib/api/types";
+import type { PlanHistoryEdit, PlanHistoryEntry } from "@/lib/api/types";
 import { QueryStatus } from "@/components/api/QueryStatus";
-import { formatLongDate, numberFormat } from "@/components/history/format";
+import { formatFullDate, formatLongDate, formatTime, numberFormat } from "@/components/history/format";
 import { amount, changeText } from "@/components/history/plan-format";
 import { mealSlotLabel } from "@/lib/profile";
 import { CALORIE_COLOR, FIBER_COLOR, MACRO_COLORS } from "@/lib/nutrients";
+
+/** Um dia com alterações: as do plano alterado daquele dia. */
+type EditDay = { date: string; edits: PlanHistoryEdit[] };
 
 export function PlanHistory() {
   const { data: plans, error, reload } = useApiQuery<PlanHistoryEntry[]>("/history/plans");
@@ -21,7 +25,7 @@ export function PlanHistory() {
       {plans.length === 0 && <p className="mt-4 text-sm text-neutral-400">Nenhum plano ainda.</p>}
 
       <ul className="mt-4 flex flex-col gap-3">
-        {plans.map((plan) => {
+        {plans.map((plan, planIndex) => {
           const totals = [
             { label: "Calorias", value: `${numberFormat.format(plan.totals.kcal)} kcal`, color: CALORIE_COLOR },
             { label: "Proteínas", value: `${plan.totals.protein} g`, color: MACRO_COLORS.proteinas },
@@ -43,17 +47,11 @@ export function PlanHistory() {
                         {plan.edited ? "Plano alterado" : "Plano montado"} · {numberFormat.format(plan.totals.kcal)} kcal
                       </span>
                     </span>
-                    {plan.edited ? (
-                      <ul className="flex flex-col gap-0.5 text-xs text-neutral-600">
-                        {plan.changes.map((change, index) => (
-                          <li key={index} className="min-w-0">
-                            <span className="text-neutral-400">{change.meal}:</span> {changeText(change)}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <span className="text-xs text-neutral-500">Plano montado pelo assistente</span>
-                    )}
+                    <span className="text-xs text-neutral-500">
+                      {plan.edited
+                        ? `${plan.changes.length} ${plan.changes.length === 1 ? "alteração" : "alterações"}`
+                        : "Plano montado pelo assistente"}
+                    </span>
                   </span>
                   <ChevronDown size={16} className="mt-1 shrink-0 text-neutral-400 transition-transform group-open:rotate-180" />
                 </summary>
@@ -74,12 +72,12 @@ export function PlanHistory() {
                   <ul className="flex flex-col gap-2">
                     {plan.meals.map((meal, index) => (
                       <li key={index} className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm">
-                        <div className="flex items-baseline gap-3">
-                          <span className="shrink-0 text-xs text-neutral-400">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-medium text-neutral-800">{meal.title}</span>
+                          <span className="text-xs text-neutral-400">
                             {mealSlotLabel(meal.slot)} · {meal.time}
                           </span>
-                          <span className="flex-1 font-medium text-neutral-800">{meal.title}</span>
-                          <span className="text-neutral-500">{meal.kcal} kcal</span>
+                          <span className="text-xs text-neutral-500 tabular-nums">{meal.kcal} kcal</span>
                         </div>
                         <ul className="mt-1 flex flex-col gap-0.5 text-neutral-600">
                           {meal.foods.map((food, foodIndex) => (
@@ -92,11 +90,83 @@ export function PlanHistory() {
                       </li>
                     ))}
                   </ul>
+
+                  {plan.edited && plan.changes.length > 0 && (
+                    <PlanEdits
+                      // Do dia deste plano para trás: os planos alterados são um por dia.
+                      days={plans
+                        .slice(planIndex)
+                        .filter((item) => item.edited && item.changes.length > 0)
+                        .map((item) => ({ date: item.date, edits: item.changes }))}
+                    />
+                  )}
                 </div>
               </details>
             </li>
           );
         })}
+      </ul>
+    </div>
+  );
+}
+
+/** Alterações por dia, uma página por dia (do dia do plano para os anteriores), cada uma com o horário. */
+function PlanEdits({ days }: { days: EditDay[] }) {
+  // 0 = o dia do plano; as próximas, os dias anteriores com alterações.
+  const [page, setPage] = useState(0);
+  const day = days[page];
+
+  return (
+    <div className="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm">
+      <h4 className="text-xs font-medium text-neutral-500">Alterações</h4>
+      {/* A data entre as setas, numa linha só dela: cabe na largura do celular. */}
+      <div className="mt-1 flex items-center justify-between gap-2">
+        {days.length > 1 ? (
+          <button
+            type="button"
+            aria-label="Dia anterior"
+            disabled={page === days.length - 1}
+            onClick={() => setPage(page + 1)}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
+          >
+            <ChevronLeft size={16} />
+          </button>
+        ) : (
+          <span className="w-8 shrink-0" />
+        )}
+        <span className="flex flex-col items-center text-center">
+          <span className="font-medium text-neutral-800 tabular-nums">{formatFullDate(day.date)}</span>
+          {days.length > 1 && (
+            <span className="text-xs text-neutral-400 tabular-nums">
+              {days.length - page} de {days.length}
+            </span>
+          )}
+        </span>
+        {days.length > 1 ? (
+          <button
+            type="button"
+            aria-label="Próximo dia"
+            disabled={page === 0}
+            onClick={() => setPage(page - 1)}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
+          >
+            <ChevronRight size={16} />
+          </button>
+        ) : (
+          <span className="w-8 shrink-0" />
+        )}
+      </div>
+      {/* Altura máxima: um dia com muitas alterações rola aqui dentro, sem aumentar o card. */}
+      <ul className="mt-2 flex max-h-60 flex-col divide-y divide-neutral-200 overflow-y-auto text-neutral-600">
+        {day.edits.map((edit, index) => (
+          <li key={index} className="flex min-w-0 flex-col gap-0.5 py-1.5">
+            <span className="text-xs text-neutral-400">
+              {edit.at && <span className="tabular-nums">{formatTime(edit.at)} · </span>}
+              {edit.meal}
+            </span>
+            <span className="break-words">{changeText(edit)}</span>
+          </li>
+        ))}
       </ul>
     </div>
   );
