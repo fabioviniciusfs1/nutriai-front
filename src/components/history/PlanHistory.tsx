@@ -10,8 +10,19 @@ import { amount, changeText } from "@/components/history/plan-format";
 import { mealSlotLabel } from "@/lib/profile";
 import { CALORIE_COLOR, FIBER_COLOR, MACRO_COLORS } from "@/lib/nutrients";
 
-/** Um dia com alterações: as do plano alterado daquele dia. */
+/** Um dia com alterações no plano. */
 type EditDay = { date: string; edits: PlanHistoryEdit[] };
+
+/** As alterações do plano por dia, na ordem delas (da mais recente para a mais antiga). */
+function editDays(edits: PlanHistoryEdit[]): EditDay[] {
+  const days: EditDay[] = [];
+  for (const edit of edits) {
+    const day = days.at(-1);
+    if (day?.date === edit.date) day.edits.push(edit);
+    else days.push({ date: edit.date, edits: [edit] });
+  }
+  return days;
+}
 
 export function PlanHistory() {
   const { data: plans, error, reload } = useApiQuery<PlanHistoryEntry[]>("/history/plans");
@@ -25,7 +36,7 @@ export function PlanHistory() {
       {plans.length === 0 && <p className="mt-4 text-sm text-neutral-400">Nenhum plano ainda.</p>}
 
       <ul className="mt-4 flex flex-col gap-3">
-        {plans.map((plan, planIndex) => {
+        {plans.map((plan) => {
           const totals = [
             { label: "Calorias", value: `${numberFormat.format(plan.totals.kcal)} kcal`, color: CALORIE_COLOR },
             { label: "Proteínas", value: `${plan.totals.protein} g`, color: MACRO_COLORS.proteinas },
@@ -44,7 +55,7 @@ export function PlanHistory() {
                         <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Atual</span>
                       )}
                       <span className="text-xs text-neutral-500">
-                        {plan.edited ? "Plano alterado" : "Plano montado"} · {numberFormat.format(plan.totals.kcal)} kcal
+                        Plano montado · {numberFormat.format(plan.totals.kcal)} kcal
                       </span>
                     </span>
                     <span className="text-xs text-neutral-500">
@@ -91,15 +102,7 @@ export function PlanHistory() {
                     ))}
                   </ul>
 
-                  {plan.edited && plan.changes.length > 0 && (
-                    <PlanEdits
-                      // Do dia deste plano para trás: os planos alterados são um por dia.
-                      days={plans
-                        .slice(planIndex)
-                        .filter((item) => item.edited && item.changes.length > 0)
-                        .map((item) => ({ date: item.date, edits: item.changes }))}
-                    />
-                  )}
+                  {plan.changes.length > 0 && <PlanEdits days={editDays(plan.changes)} />}
                 </div>
               </details>
             </li>
@@ -110,9 +113,9 @@ export function PlanHistory() {
   );
 }
 
-/** Alterações por dia, uma página por dia (do dia do plano para os anteriores), cada uma com o horário. */
+/** Alterações do plano, uma página por dia (do mais recente para os anteriores), cada uma com o horário. */
 function PlanEdits({ days }: { days: EditDay[] }) {
-  // 0 = o dia do plano; as próximas, os dias anteriores com alterações.
+  // 0 = o dia mais recente com alterações; as próximas, os dias anteriores.
   const [page, setPage] = useState(0);
   const day = days[page];
 
