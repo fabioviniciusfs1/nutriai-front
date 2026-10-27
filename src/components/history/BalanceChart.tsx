@@ -26,7 +26,8 @@ type BalanceChartProps = {
 function BalanceTooltip({ active, payload, label }: TooltipContentProps<ValueType, NameType>) {
   if (!active || !payload?.length) return null;
   const day = payload[0].payload as ActivityDay;
-  const balance = day.consumed - day.burned;
+  // Sem dados de atividade no dia não há gasto nem saldo.
+  const balance = day.burned === null ? null : day.consumed - day.burned;
 
   return (
     <div className="rounded-xl bg-neutral-800/95 p-4 text-white shadow-lg">
@@ -38,18 +39,23 @@ function BalanceTooltip({ active, payload, label }: TooltipContentProps<ValueTyp
         <div key={item.name} className="flex items-center gap-2 text-sm">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
           <span className="text-neutral-300">{item.name}</span>
-          <span className="ml-auto pl-4 font-semibold">{numberFormat.format(item.value)} kcal</span>
+          <span className="ml-auto pl-4 font-semibold">
+            {item.value === null ? "—" : `${numberFormat.format(item.value)} kcal`}
+          </span>
         </div>
       ))}
-      <div className="mt-2 flex items-center gap-2 border-t border-white/10 pt-2 text-sm">
-        <span className="text-neutral-300">Saldo</span>
-        <span className="ml-auto pl-4 font-semibold">{formatSigned(balance)} kcal</span>
-      </div>
+      {balance !== null && (
+        <div className="mt-2 flex items-center gap-2 border-t border-white/10 pt-2 text-sm">
+          <span className="text-neutral-300">Saldo</span>
+          <span className="ml-auto pl-4 font-semibold">{formatSigned(balance)} kcal</span>
+        </div>
+      )}
     </div>
   );
 }
 
 export function BalanceChart({ days, goal }: BalanceChartProps) {
+  const hasBurned = days.some((day) => day.burned !== null);
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
       <h3 className="font-semibold text-neutral-900">Calorias Consumidas vs Gastas</h3>
@@ -58,10 +64,14 @@ export function BalanceChart({ days, goal }: BalanceChartProps) {
           <span className="h-0.5 w-4 rounded-full" style={{ backgroundColor: CONSUMED_COLOR }} /> Consumidas
           (plano alimentar)
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 rounded-full" style={{ backgroundColor: BURNED_COLOR }} /> Gastas
-          (basal + atividade)
-        </span>
+        {hasBurned ? (
+          <span className="flex items-center gap-1.5">
+            <span className="h-0.5 w-4 rounded-full" style={{ backgroundColor: BURNED_COLOR }} /> Gastas
+            (basal + atividade)
+          </span>
+        ) : (
+          <span>Sem dados de atividade: conecte o Google para ver as calorias gastas.</span>
+        )}
         <span className="flex items-center gap-1.5">
           <span className="w-4 border-t-2 border-dashed border-neutral-400" /> Meta ({numberFormat.format(goal)}{" "}
           kcal)

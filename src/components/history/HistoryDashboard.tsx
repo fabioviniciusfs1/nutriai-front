@@ -44,17 +44,24 @@ export function HistoryDashboard() {
       {summary.data ? (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatTile label="Média consumida" value={numberFormat.format(summary.data.avgConsumed)} unit="kcal/dia" />
-          <StatTile label="Média gasta" value={numberFormat.format(summary.data.avgBurned)} unit="kcal/dia" />
+          <StatTile
+            label="Média gasta"
+            value={summary.data.avgBurned === null ? "—" : numberFormat.format(summary.data.avgBurned)}
+            unit={summary.data.avgBurned === null ? undefined : "kcal/dia"}
+            hint={summary.data.avgBurned === null ? "Sem dados de atividade" : undefined}
+          />
           <StatTile
             label="Saldo médio"
-            value={formatSigned(summary.data.avgBalance)}
-            unit="kcal/dia"
+            value={summary.data.avgBalance === null ? "—" : formatSigned(summary.data.avgBalance)}
+            unit={summary.data.avgBalance === null ? undefined : "kcal/dia"}
             hint={
-              summary.data.avgBalance < 0
-                ? "Déficit calórico"
-                : summary.data.avgBalance > 0
-                  ? "Superávit calórico"
-                  : "Equilíbrio"
+              summary.data.avgBalance === null
+                ? undefined
+                : summary.data.avgBalance < 0
+                  ? "Déficit calórico"
+                  : summary.data.avgBalance > 0
+                    ? "Superávit calórico"
+                    : "Equilíbrio"
             }
           />
           <StatTile
