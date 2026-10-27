@@ -20,6 +20,7 @@ import { addWeightEntry, WEIGHTS_PATH } from "@/lib/api/actions";
 import type { WeightEntry } from "@/lib/api/types";
 import { QueryStatus } from "@/components/api/QueryStatus";
 import { WeightDialog } from "@/components/history/WeightDialog";
+import type { HistoryPeriod } from "@/components/history/HistoryDashboard";
 
 const LINE_COLOR = "#8b5cf6";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -76,8 +77,8 @@ function weightTicks(min: number, max: number) {
 }
 
 type WeightChartProps = {
-  /** Últimos N dias, o mesmo período dos outros gráficos. */
-  period: number;
+  /** O mesmo período dos outros gráficos; nunca antes do dia em que a conta foi criada. */
+  period: HistoryPeriod;
 };
 
 export function WeightChart({ period }: WeightChartProps) {
@@ -96,7 +97,9 @@ function WeightChartCard({ period, entries }: WeightChartProps & { entries: Weig
   const lastEntry = entries[entries.length - 1];
   const [openedAt] = useState(() => Date.now());
   const end = Math.max(openedAt, lastEntry ? new Date(lastEntry.at).getTime() : 0);
-  const start = end - period * DAY_MS;
+  // Meia-noite (no fuso do usuário) do dia em que a conta foi criada.
+  const createdAt = auth?.user ? new Date(`${auth.user.createdOn}T00:00:00`).getTime() : -Infinity;
+  const start = period === "all" ? createdAt : Math.max(createdAt, end - period * DAY_MS);
 
   const points: Point[] = entries
     .map((entry, index) => ({
@@ -188,7 +191,9 @@ function WeightChartCard({ period, entries }: WeightChartProps & { entries: Weig
         <div className="mt-4 flex h-40 flex-col items-center justify-center gap-2 rounded-xl bg-neutral-50 text-center text-sm text-neutral-500">
           <Scale size={24} className="text-neutral-400" />
           {entries.length > 0
-            ? `Nenhum peso registrado nos últimos ${period} dias.`
+            ? period === "all"
+              ? "Nenhum peso registrado desde a criação da conta."
+              : `Nenhum peso registrado nos últimos ${period} dias.`
             : "Nenhum peso registrado ainda."}
         </div>
       )}

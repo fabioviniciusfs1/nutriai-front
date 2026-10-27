@@ -5,7 +5,7 @@ import type { AuthResponse, GoogleLinkResponse, Me, Targets } from "@/lib/api/ty
 import type { Profile, Routine } from "@/lib/profile";
 
 export type AuthState = {
-  user: { name: string; username: string } | null;
+  user: Me["user"] | null;
   profile: Profile | null;
   routine: Routine | null;
   targets: Targets | null;

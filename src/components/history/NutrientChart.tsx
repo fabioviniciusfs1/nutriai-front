@@ -17,6 +17,7 @@ import { CircleCheck, TriangleAlert } from "lucide-react";
 import { useApiQuery } from "@/lib/api/query";
 import type { NutrientGroup, NutrientHistory } from "@/lib/api/types";
 import { QueryStatus, Spinner } from "@/components/api/QueryStatus";
+import type { HistoryPeriod } from "@/components/history/HistoryDashboard";
 import { formatLongDate, formatShortDate, numberFormat } from "@/components/history/format";
 
 const LINE_COLOR = "#f4623a";
@@ -33,7 +34,7 @@ function percentOf(value: number, meta: number) {
 }
 
 /** Consumo diário de um nutriente escolhido; médias e contagens de dias vêm do backend. */
-export function NutrientChart({ period }: { period: number }) {
+export function NutrientChart({ period }: { period: HistoryPeriod }) {
   const groups = useApiQuery<NutrientGroup[]>("/nutrients/groups");
   const [selected, setSelected] = useState<string | null>(null);
   const allNutrients = groups.data?.flatMap((group) => group.nutrients) ?? [];

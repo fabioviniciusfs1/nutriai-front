@@ -11,10 +11,17 @@ import { ActivityPanel } from "@/components/history/ActivityPanel";
 import { NutrientChart } from "@/components/history/NutrientChart";
 import { formatSigned, numberFormat } from "@/components/history/format";
 
-const PERIODS = [7, 30, 90] as const;
+/** Últimos 7 ou 30 dias, ou "all": desde a criação da conta (o backend nunca mostra antes dela). */
+export type HistoryPeriod = 7 | 30 | "all";
+
+const PERIODS: { value: HistoryPeriod; label: string }[] = [
+  { value: 7, label: "7 dias" },
+  { value: 30, label: "30 dias" },
+  { value: "all", label: "Todos" },
+];
 
 export function HistoryDashboard() {
-  const [period, setPeriod] = useState<(typeof PERIODS)[number]>(30);
+  const [period, setPeriod] = useState<HistoryPeriod>(30);
   // Médias, dias na meta e totais já vêm calculados do backend para o período escolhido.
   const summary = useApiQuery<HistorySummary>(`/history/summary?days=${period}`);
   const activity = useApiQuery<ActivityHistory>(`/history/activity?days=${period}`);
@@ -27,15 +34,15 @@ export function HistoryDashboard() {
         <div role="group" aria-label="Período" className="flex gap-2">
           {PERIODS.map((item) => (
             <button
-              key={item}
+              key={item.value}
               type="button"
-              aria-pressed={period === item}
-              onClick={() => setPeriod(item)}
+              aria-pressed={period === item.value}
+              onClick={() => setPeriod(item.value)}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                period === item ? "bg-accent text-white" : "bg-accent/15 text-accent hover:bg-accent/25"
+                period === item.value ? "bg-accent text-white" : "bg-accent/15 text-accent hover:bg-accent/25"
               }`}
             >
-              {item} dias
+              {item.label}
             </button>
           ))}
         </div>
