@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Scale } from "lucide-react";
+import Link from "next/link";
+import { Flame, Scale } from "lucide-react";
 import { useApiQuery } from "@/lib/api/query";
 import { addWeightEntry, WEIGHTS_PATH } from "@/lib/api/actions";
 import type { WeightEntry } from "@/lib/api/types";
@@ -30,13 +31,21 @@ function NotificationCard({ notification }: { notification: AppNotification }) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-white p-5 shadow-sm">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-        <Scale size={20} />
+        {notification.kind === "calories" ? <Flame size={20} /> : <Scale size={20} />}
       </span>
       <div className="min-w-0 flex-1">
         <h3 className="font-semibold text-neutral-900">{notification.title}</h3>
         <p className="text-sm text-neutral-500">{notification.text}</p>
       </div>
       {notification.kind === "weigh-in" && <WeighInAction />}
+      {notification.kind === "calories" && (
+        <Link
+          href="/ajuste-dieta"
+          className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90"
+        >
+          Ajustar calorias
+        </Link>
+      )}
     </div>
   );
 }

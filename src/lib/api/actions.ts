@@ -2,6 +2,8 @@
 // resultado já calculado; o front só atualiza o cache. Cada função devolve `null` se falhou.
 import { mutate } from "@/lib/api/query";
 import type {
+  CalorieAdjustment,
+  CalorieStep,
   DietAdjustment,
   DietEstimateRequest,
   DietPreview,
@@ -18,6 +20,7 @@ export const TODAY_PLAN_PATH = "/plan/today";
 export const RESTRICTED_FOODS_PATH = "/foods/restricted";
 export const WEIGHTS_PATH = "/weights";
 export const DIET_PATH = "/me/diet";
+export const CALORIES_PATH = "/me/calories";
 
 /**
  * Toda mudança no plano: o plano de hoje vem na resposta; as prévias por refeição, o consumo de hoje
@@ -82,6 +85,17 @@ export function estimateDiet(request: DietEstimateRequest) {
 /** O plano de hoje com o ajuste, sem salvar ("Ver prévia"). */
 export function previewDiet(settings: DietSettings) {
   return mutate<DietPreview>(`${DIET_PATH}/preview`, "POST", settings);
+}
+
+/**
+ * "+10%" ou "−10%" na meta calórica: a meta (de /me e do ajuste da dieta), as porções do plano e o histórico
+ * mudam; a sugestão da central de notificações vem de /me.
+ */
+export function stepCalories(direction: CalorieStep) {
+  return mutate<CalorieAdjustment>(CALORIES_PATH, "POST", { direction }, {
+    update: CALORIES_PATH,
+    invalidate: [ME_PATH, DIET_PATH, "/plan", "/nutrition", "/history"],
+  });
 }
 
 /** Salva o ajuste da dieta: as metas, as porções do plano e o histórico mudam. */

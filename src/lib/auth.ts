@@ -10,12 +10,21 @@ export type AuthState = {
   routine: Routine | null;
   targets: Targets | null;
   weighInDue: boolean;
+  calorieAdvice: Me["calorieAdvice"];
   google: Me["google"];
 };
 
 type Result = { ok: true } | { ok: false; error: string };
 
-const SIGNED_OUT: AuthState = { user: null, profile: null, routine: null, targets: null, weighInDue: false, google: null };
+const SIGNED_OUT: AuthState = {
+  user: null,
+  profile: null,
+  routine: null,
+  targets: null,
+  weighInDue: false,
+  calorieAdvice: null,
+  google: null,
+};
 
 export const ME_PATH = "/me";
 
@@ -187,6 +196,10 @@ export async function saveProfile(profile: Profile) {
 
 /** O peso meta pode mudar depois do cadastro (o resto do perfil, não); `null` tira a meta. */
 export async function saveTargetWeight(targetWeightKg: number | null) {
-  const me = await mutate<Me>("/me/target-weight", "PUT", { targetWeightKg }, { update: ME_PATH });
+  // O peso meta decide se a pessoa ganha ou perde peso: muda o objetivo e a sugestão do ajuste das calorias.
+  const me = await mutate<Me>("/me/target-weight", "PUT", { targetWeightKg }, {
+    update: ME_PATH,
+    invalidate: ["/me/calories"],
+  });
   return me !== null;
 }
