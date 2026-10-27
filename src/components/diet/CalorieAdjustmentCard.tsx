@@ -80,11 +80,7 @@ export function CalorieAdjustmentCard() {
         type="button"
         onClick={() => press(direction)}
         disabled={busy || (decrease && atFloor)}
-        className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-40 ${
-          suggested === direction
-            ? "bg-accent text-white hover:bg-accent/90"
-            : "bg-accent/15 text-accent hover:bg-accent/25"
-        }`}
+        className="flex items-center gap-1.5 rounded-full bg-accent/15 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40"
       >
         {decrease ? <Minus size={16} /> : <Plus size={16} />}
         {decrease ? "Diminuir" : "Aumentar"} 10% ({numberFormat.format(to)} kcal)
@@ -125,7 +121,7 @@ export function CalorieAdjustmentCard() {
                 <button
                   type="button"
                   onClick={() => setTargetText("")}
-                  className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-accent hover:bg-white/70"
+                  className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
                 >
                   Escolher novo peso meta
                 </button>
@@ -140,7 +136,7 @@ export function CalorieAdjustmentCard() {
                       value={targetText}
                       onChange={(event) => setTargetText(event.target.value)}
                       placeholder="Ex.: 55"
-                      className="w-24 rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-right tabular-nums focus:border-accent focus:outline-none"
+                      className="w-24 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-right tabular-nums focus:border-accent focus:outline-none"
                     />
                     kg
                   </label>
@@ -148,14 +144,14 @@ export function CalorieAdjustmentCard() {
                     type="button"
                     onClick={() => void saveTarget()}
                     disabled={busy || targetText.trim() === ""}
-                    className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-40"
+                    className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
                   >
                     Salvar peso meta
                   </button>
                   <button
                     type="button"
                     onClick={() => setTargetText(null)}
-                    className="rounded-full px-3 py-1.5 text-sm font-medium text-neutral-500 hover:bg-white/70"
+                    className="rounded-full px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100"
                   >
                     Cancelar
                   </button>
@@ -167,21 +163,21 @@ export function CalorieAdjustmentCard() {
       )}
 
       {confirming && (
-        <div role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
-          <p className="text-amber-900">{warning(confirming, data)}</p>
+        <div role="alert" className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm">
+          <p className="text-neutral-700">{warning(confirming, data)}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => void apply(confirming)}
               disabled={busy}
-              className="rounded-full bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-40"
+              className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
             >
               {confirming === "decrease" ? "Diminuir" : "Aumentar"} mesmo assim
             </button>
             <button
               type="button"
               onClick={() => setConfirming(null)}
-              className="rounded-full px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-amber-100"
+              className="rounded-full px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100"
             >
               Cancelar
             </button>
