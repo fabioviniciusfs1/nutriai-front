@@ -431,6 +431,7 @@ export function RoutineForm() {
         description="A rotina foi salva. O assistente pode montar um plano novo com ela: as mudanças que você fez no plano atual são desfeitas (os alimentos marcados continuam)."
         confirmLabel="Refazer meu plano"
         cancelLabel="Agora não"
+        highlightCancel
         onConfirm={() => void rebuildPlan()}
         onCancel={() => {
           setAskingRebuild(false);
