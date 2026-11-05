@@ -71,14 +71,9 @@ export function RoutineForm() {
     trainingStart: saved?.trainingStart ?? "18:00",
     trainingEnd: saved?.trainingEnd ?? "19:00",
   });
-  // Horas (0 a 23) em que a pessoa disse que não pode comer; as outras fora do sono e do treino ficam
-  // disponíveis. No cadastro, nenhuma: todas vêm disponíveis.
-  const [blocked, setBlocked] = useState<number[]>(() => {
-    if (!saved) return [];
-    const busy = unavailableHours(busyTimes(times, trains));
-    const available = hoursOfWindows(saved.eatingWindows);
-    return HOURS.filter((hour) => !busy.includes(hour) && !available.includes(hour));
-  });
+  // Horas (0 a 23) em que a pessoa disse que pode comer; as do sono e do treino não contam. No cadastro,
+  // nenhuma: a pessoa marca as dela.
+  const [allowed, setAllowed] = useState<number[]>(() => (saved ? hoursOfWindows(saved.eatingWindows) : []));
   const [meals, setMeals] = useState<MealSlot[]>(saved?.meals ?? []);
   // `null` = ainda sem resposta (só no cadastro); "nenhum" = "Não sinto", salvo como `null`.
   const [hungriest, setHungriest] = useState<HungerAnswer | null>(saved ? (saved.hungriestPeriod ?? "nenhum") : null);
@@ -94,7 +89,7 @@ export function RoutineForm() {
   const [confirming, setConfirming] = useState(false);
 
   const busyHours = unavailableHours(busyTimes(times, trains));
-  const hours = HOURS.filter((hour) => !busyHours.includes(hour) && !blocked.includes(hour));
+  const hours = HOURS.filter((hour) => !busyHours.includes(hour) && allowed.includes(hour));
   const sameTraining = trains === true && times.trainingStart === times.trainingEnd;
   const samePeriod = hungriest !== null && hungriest !== "nenhum" && hungriest === leastHungry;
 
@@ -124,7 +119,7 @@ export function RoutineForm() {
     setPicking({ title, value, onConfirm });
   }
 
-  /** Muda sono ou treino; as horas que saem do sono ou do treino voltam disponíveis (se não foram bloqueadas). */
+  /** Muda sono ou treino; as horas que saem do sono ou do treino voltam marcadas só se a pessoa já as tinha marcado. */
   function changeTimes(change: Partial<FormTimes>, nextTrains = trains) {
     const next = { ...times, ...change };
     setTimes(next);
@@ -248,23 +243,23 @@ export function RoutineForm() {
 
             <fieldset className="mt-4" data-invalid={showErrors && hours.length === 0 ? true : undefined}>
               <legend className="text-sm font-medium text-neutral-700">
-                Toque nos horários em que você não pode comer
+                Toque nos horários em que você pode comer
               </legend>
               <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {HOURS.filter((hour) => !busyHours.includes(hour)).map((hour) => {
-                  const checked = !blocked.includes(hour);
+                  const checked = allowed.includes(hour);
                   return (
                     <button
                       key={hour}
                       type="button"
                       aria-pressed={checked}
                       onClick={() =>
-                        setBlocked((current) => (checked ? [...current, hour] : current.filter((item) => item !== hour)))
+                        setAllowed((current) => (checked ? current.filter((item) => item !== hour) : [...current, hour]))
                       }
                       className={`rounded-xl border py-2 text-sm font-medium tabular-nums transition-colors ${
                         checked
                           ? "border-accent bg-accent/5 text-accent"
-                          : "border-neutral-200 text-neutral-400 line-through hover:border-neutral-300"
+                          : "border-neutral-200 text-neutral-500 hover:border-neutral-300"
                       }`}
                     >
                       {hourText(hour)}
@@ -273,7 +268,7 @@ export function RoutineForm() {
                 })}
               </div>
               {showErrors && hours.length === 0 && (
-                <p className="mt-1 text-xs text-red-600">Deixe pelo menos um horário disponível</p>
+                <p className="mt-1 text-xs text-red-600">Marque pelo menos um horário</p>
               )}
             </fieldset>
           </section>
