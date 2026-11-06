@@ -40,6 +40,8 @@ export function DietAdjustmentForm() {
   const [savedMessage, setSavedMessage] = useState(false);
   // Plano com o ajuste, ainda não salvo; sai a cada mudança nos controles.
   const [preview, setPreview] = useState<DietPreviewData | null>(null);
+  // Plano da prévia (com grupos de dias na rotina): `null` = o de hoje.
+  const [previewPlan, setPreviewPlan] = useState<number | null>(null);
 
   if (!data) return <QueryStatus title="Ajuste da dieta" error={error} onRetry={reload} />;
 
@@ -68,10 +70,13 @@ export function DietAdjustmentForm() {
     setBusy(false);
   }
 
-  async function showPreview() {
+  async function showPreview(planId: number | null = null) {
     setBusy(true);
-    const result = await previewDiet(settings());
-    if (result) setPreview(result);
+    const result = await previewDiet(settings(), planId);
+    if (result) {
+      setPreview(result);
+      setPreviewPlan(planId);
+    }
     setBusy(false);
   }
 
@@ -175,7 +180,7 @@ export function DietAdjustmentForm() {
           </div>
           <button
             type="button"
-            onClick={showPreview}
+            onClick={() => void showPreview()}
             disabled={busy || !changed}
             className="mt-5 w-full rounded-full bg-accent py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
           >
@@ -189,7 +194,17 @@ export function DietAdjustmentForm() {
         </aside>
       </div>
 
-      {preview && <DietPreview preview={preview} busy={busy} onBack={() => setPreview(null)} onApprove={save} />}
+      {preview && (
+        <DietPreview
+          preview={preview}
+          busy={busy}
+          plans={plan?.plans ?? []}
+          planId={previewPlan ?? plan?.plan.id ?? null}
+          onSelectPlan={(id) => void showPreview(plan?.plans.find((item) => item.id === id)?.active ? null : id)}
+          onBack={() => setPreview(null)}
+          onApprove={save}
+        />
+      )}
     </div>
   );
 }

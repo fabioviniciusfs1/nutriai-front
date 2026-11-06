@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { DietPreview as DietPreviewData, PlanHistoryChange } from "@/lib/api/types";
+import type { DietPreview as DietPreviewData, PlanHistoryChange, TodayPlan } from "@/lib/api/types";
+import { daysLabel } from "@/lib/plan-selection";
 import { numberFormat } from "@/components/history/format";
 import { amount, changeText } from "@/components/history/plan-format";
 import { mealSlotLabel } from "@/lib/profile";
@@ -10,6 +11,11 @@ import { CALORIE_COLOR, FIBER_COLOR, MACRO_COLORS } from "@/lib/nutrients";
 type DietPreviewProps = {
   preview: DietPreviewData;
   busy: boolean;
+  /** Os planos dos grupos de dias da rotina: com mais de um, a prévia tem uma aba por plano. */
+  plans: TodayPlan["plans"];
+  /** O plano da prévia. */
+  planId: number | null;
+  onSelectPlan: (id: number) => void;
   onBack: () => void;
   onApprove: () => void;
 };
@@ -22,7 +28,7 @@ function byMeal(changes: PlanHistoryChange[]) {
 }
 
 /** Prévia do plano com o ajuste da dieta: totais atual → novo, o que muda e o plano novo. */
-export function DietPreview({ preview, busy, onBack, onApprove }: DietPreviewProps) {
+export function DietPreview({ preview, busy, plans, planId, onSelectPlan, onBack, onApprove }: DietPreviewProps) {
   const ref = useRef<HTMLElement>(null);
   // Abre abaixo dos controles: rola até ela.
   useEffect(() => {
@@ -40,7 +46,41 @@ export function DietPreview({ preview, busy, onBack, onApprove }: DietPreviewPro
   return (
     <section ref={ref} className="rounded-2xl bg-white p-5 shadow-sm">
       <h3 className="font-semibold text-neutral-900">Prévia do plano</h3>
-      <p className="mt-1 text-sm text-neutral-500">É assim que o seu plano fica com o ajuste. Nada foi salvo ainda.</p>
+      <p className="mt-1 text-sm text-neutral-500">
+        {plans.length > 1
+          ? "É assim que cada plano fica com o ajuste, que vale para todos. Nada foi salvo ainda."
+          : "É assim que o seu plano fica com o ajuste. Nada foi salvo ainda."}
+      </p>
+
+      {plans.length > 1 && (
+        <div role="tablist" aria-label="Planos" className="mt-3 flex flex-wrap gap-2">
+          {plans.map((item) => {
+            const open = item.id === planId;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={open}
+                disabled={busy}
+                onClick={() => !open && onSelectPlan(item.id)}
+                className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-60 ${
+                  open
+                    ? "border-accent bg-accent/5 text-accent"
+                    : "border-neutral-200 text-neutral-600 hover:border-neutral-300"
+                }`}
+              >
+                {daysLabel(item.days)}
+                {item.active && (
+                  <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">
+                    Hoje
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
         {totals.map((total) => (

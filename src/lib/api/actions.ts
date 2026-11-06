@@ -88,8 +88,9 @@ export function estimateDiet(request: DietEstimateRequest) {
 }
 
 /** O plano de hoje com o ajuste, sem salvar ("Ver prévia"). */
-export function previewDiet(settings: DietSettings) {
-  return mutate<DietPreview>(`${DIET_PATH}/preview`, "POST", settings);
+/** `plan`: o plano de outro grupo de dias (sem ele, o de hoje); o ajuste vale para todos. */
+export function previewDiet(settings: DietSettings, plan: number | null = null) {
+  return mutate<DietPreview>(withPlan(`${DIET_PATH}/preview`, plan), "POST", settings);
 }
 
 /**
