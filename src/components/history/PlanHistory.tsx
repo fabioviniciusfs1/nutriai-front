@@ -8,6 +8,7 @@ import { QueryStatus } from "@/components/api/QueryStatus";
 import { formatFullDate, formatLongDate, formatTime, numberFormat } from "@/components/history/format";
 import { amount, changeText } from "@/components/history/plan-format";
 import { mealSlotLabel } from "@/lib/profile";
+import { daysLabel } from "@/lib/plan-selection";
 import { CALORIE_COLOR, FIBER_COLOR, MACRO_COLORS } from "@/lib/nutrients";
 
 /** Um dia com alterações no plano. */
@@ -53,6 +54,12 @@ export function PlanHistory() {
                       <span className="font-medium text-neutral-900">{formatLongDate(plan.date)}</span>
                       {plan.current && (
                         <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Atual</span>
+                      )}
+                      {/* Com grupos de dias na rotina, cada plano mostra os dias dele. */}
+                      {plan.days.length > 0 && plan.days.length < 7 && (
+                        <span className="rounded-full bg-neutral-200/70 px-2 py-0.5 text-xs font-medium text-neutral-700">
+                          {daysLabel(plan.days)}
+                        </span>
                       )}
                       <span className="text-xs text-neutral-500">
                         Plano montado · {numberFormat.format(plan.totals.kcal)} kcal

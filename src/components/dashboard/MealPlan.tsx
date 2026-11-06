@@ -20,35 +20,79 @@ import { FoodFeedbackDialog } from "@/components/dashboard/FoodFeedbackDialog";
 import { MealTimeAdviceDialog } from "@/components/dashboard/MealTimeAdviceDialog";
 import { TimePickerDialog } from "@/components/dashboard/TimePickerDialog";
 import { AddFoodDialog } from "@/components/dashboard/AddFoodDialog";
+import { daysLabel, selectPlan, useSelectedPlan, withPlan } from "@/lib/plan-selection";
 
 /**
  * Plano de hoje, já calculado pelo backend (trocas, porções, alimentos acrescentados). Cada
- * ação envia um pedido e a resposta é o plano atualizado.
+ * ação envia um pedido e a resposta é o plano atualizado. Com grupos de dias na rotina, as abas
+ * mostram os outros planos (o de hoje vem marcado).
  */
 export function MealPlan() {
-  const { data: plan, error, reload } = useApiQuery<TodayPlan>(TODAY_PLAN_PATH);
+  const selected = useSelectedPlan();
+  const { data: plan, error, reload } = useApiQuery<TodayPlan>(withPlan(TODAY_PLAN_PATH, selected));
   const personalizing = plan?.personalization === "pending";
+  const anyPersonalizing = plan?.plans.some((item) => item.personalization === "pending") ?? false;
 
-  // Enquanto o assistente monta o plano individual, pergunta de novo a cada poucos segundos (o consumo de
+  // Enquanto o assistente monta algum plano individual, pergunta de novo a cada poucos segundos (o consumo de
   // hoje acompanha o plano).
   useEffect(() => {
-    if (!personalizing) return;
+    if (!anyPersonalizing) return;
     const timer = setInterval(() => invalidate(TODAY_PLAN_PATH, "/nutrition"), PERSONALIZATION_POLL_MS);
     return () => clearInterval(timer);
-  }, [personalizing]);
+  }, [anyPersonalizing]);
+
+  // O plano escolhido pode ter saído da rotina: volta para o de hoje.
+  useEffect(() => {
+    if (error && selected !== null) selectPlan(null);
+  }, [error, selected]);
 
   if (!plan) return <QueryStatus title="Plano Alimentar" error={error} onRetry={reload} />;
-  if (personalizing) return <PersonalizingCard />;
-  return <MealPlanView plan={plan} />;
+  const tabs = <PlanTabs plan={plan} />;
+  if (personalizing) return <PersonalizingCard tabs={tabs} />;
+  return <MealPlanView plan={plan} tabs={tabs} />;
+}
+
+/** Um plano por grupo de dias da rotina: as abas só aparecem com mais de um. */
+function PlanTabs({ plan }: { plan: TodayPlan }) {
+  if (plan.plans.length < 2) return null;
+  return (
+    <div role="tablist" aria-label="Planos" className="mt-3 flex flex-wrap gap-2">
+      {plan.plans.map((item) => {
+        const open = item.id === plan.plan.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={open}
+            onClick={() => selectPlan(item.active ? null : item.id)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors ${
+              open
+                ? "border-accent bg-accent/5 text-accent"
+                : "border-neutral-200 text-neutral-600 hover:border-neutral-300"
+            }`}
+          >
+            {daysLabel(item.days)}
+            {item.active && (
+              <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">
+                Hoje
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 const PERSONALIZATION_POLL_MS = 3000;
 
 /** No lugar do plano enquanto o assistente monta o plano individual. */
-function PersonalizingCard() {
+function PersonalizingCard({ tabs }: { tabs: React.ReactNode }) {
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
       <h3 className="font-semibold text-neutral-900">Plano Alimentar</h3>
+      {tabs}
       <div className="flex min-h-32 flex-col items-center justify-center gap-3 text-center">
         <Spinner />
         <p className="font-medium text-neutral-900">Montando seu plano personalizado…</p>
@@ -61,9 +105,9 @@ function PersonalizingCard() {
 }
 
 /** Aviso se a montagem do plano individual falhou (fica o plano padrão). */
-function PersonalizationNotice({ personalization }: { personalization: TodayPlan["personalization"] }) {
+function PersonalizationNotice({ plan }: { plan: TodayPlan }) {
   const [retrying, setRetrying] = useState(false);
-  if (personalization !== "failed") return null;
+  if (plan.personalization !== "failed") return null;
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
       <p>Não conseguimos montar seu plano personalizado. Este é o plano padrão.</p>
@@ -72,7 +116,7 @@ function PersonalizationNotice({ personalization }: { personalization: TodayPlan
         disabled={retrying}
         onClick={async () => {
           setRetrying(true);
-          await personalizePlan();
+          await personalizePlan(plan.plan.id);
           setRetrying(false);
         }}
         className="font-medium underline-offset-2 hover:underline disabled:opacity-50"
@@ -86,7 +130,7 @@ function PersonalizationNotice({ personalization }: { personalization: TodayPlan
 /** Refeição cujo horário está sendo mudado. */
 type EditingTime = { id: number; slot: MealSlot; title: string; time: string };
 
-function MealPlanView({ plan }: { plan: TodayPlan }) {
+function MealPlanView({ plan, tabs }: { plan: TodayPlan; tabs: React.ReactNode }) {
   const [time, setTime] = useState("Todos");
   const [editingTime, setEditingTime] = useState<EditingTime | null>(null);
   // Conferindo o novo horário com o assistente antes de salvar.
@@ -151,6 +195,7 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
       <h3 className="font-semibold text-neutral-900">Plano Alimentar</h3>
+      {tabs}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {mealTimes.map((item) => (
@@ -169,10 +214,10 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
         ))}
       </div>
 
-      <PersonalizationNotice personalization={plan.personalization} />
+      <PersonalizationNotice plan={plan} />
 
       {plan.meals.length === 0 && (
-        <p className="mt-4 text-sm text-neutral-400">Nenhuma refeição no plano de hoje.</p>
+        <p className="mt-4 text-sm text-neutral-400">Nenhuma refeição neste plano.</p>
       )}
 
       <ul className="mt-4 flex flex-col gap-4">
@@ -195,17 +240,20 @@ function MealPlanView({ plan }: { plan: TodayPlan }) {
                 >
                   <Clock size={12} /> {meal.time}
                 </button>
-                {/* Na mesma coluna (e do mesmo tamanho) que o botão de substituir de cada alimento. */}
+                {/* Na mesma coluna (e do mesmo tamanho) que o botão de substituir de cada alimento. O extra vale
+                    só no dia em que entrou: só no plano de hoje. */}
                 <div className="ml-auto flex w-[3.75rem] justify-start">
-                  <button
-                    type="button"
-                    title="Adicionar alimento extra"
-                    aria-label={`Adicionar alimento extra: ${meal.title}`}
-                    onClick={() => setAddingFoodTo(meal.id)}
-                    className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
-                  >
-                    <PlusCircle size={15} />
-                  </button>
+                  {plan.plan.active && (
+                    <button
+                      type="button"
+                      title="Adicionar alimento extra"
+                      aria-label={`Adicionar alimento extra: ${meal.title}`}
+                      onClick={() => setAddingFoodTo(meal.id)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
+                    >
+                      <PlusCircle size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-500">

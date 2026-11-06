@@ -2,7 +2,7 @@
 // O backend faz todas as contas (metas, plano do dia, porções, trocas, estatísticas); o front só exibe.
 import type { FoodFeedback } from "@/lib/food-feedback";
 import type { FoodGroup } from "@/lib/food-groups";
-import type { MealSlot, Profile, Routine } from "@/lib/profile";
+import type { MealSlot, Profile, Routine, Weekday } from "@/lib/profile";
 
 // ---------------------------------------------------------------------------------------------
 // Usuário
@@ -196,6 +196,18 @@ export type MealTimeCheck = {
 export type TodayPlan = {
   meals: PlanMeal[];
   personalization: Personalization;
+  /** O plano que veio: o de hoje, ou o pedido com `?plan=<id>`. */
+  plan: PlanSummary;
+  /** Todos os planos do usuário (um por grupo de dias da rotina), em ordem de `id`. */
+  plans: (PlanSummary & { personalization: Personalization })[];
+};
+
+/** Plano de um grupo de dias da rotina (`id` = `RoutineSchedule.id`). */
+export type PlanSummary = {
+  id: number;
+  days: Weekday[];
+  /** É o plano de hoje (o grupo tem o dia de hoje). */
+  active: boolean;
 };
 
 export type FoodSearchResult = {
@@ -347,8 +359,10 @@ export type PlanHistoryEntry = {
   date: string;
   /** `true` = o usuário alterou o plano depois de montado (`changes` não está vazio). */
   edited: boolean;
-  /** O plano em vigor (o primeiro da lista). */
+  /** O plano em vigor do grupo de dias dele (a versão mais recente do grupo). */
   current: boolean;
+  /** Dias da semana do grupo do plano, como estão na rotina agora (vazio se o grupo não existe mais). */
+  days: Weekday[];
   totals: Totals & { fiber: number };
   meals: { slot: MealSlot; title: string; time: string; kcal: number; foods: PlanHistoryFood[] }[];
   /** Alterações feitas nesse plano, da mais recente para a mais antiga; vazio se não mudou. */

@@ -6,6 +6,7 @@ import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
 import { ApiError, apiFetch } from "@/lib/api/client";
 import type { PlanFood } from "@/lib/api/types";
 import { Spinner } from "@/components/api/QueryStatus";
+import { withPlan } from "@/lib/plan-selection";
 
 /** Quantos nomes já mostrados o backend aceita no "Ver mais"; com isso na tela, o botão some. */
 const MAX_SHOWN_SUBSTITUTES = 64;
@@ -41,7 +42,7 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
   const [exhausted, setExhausted] = useState(false);
   // Só a resposta do último pedido vale (o usuário pode pesquisar de novo antes de a anterior chegar).
   const lastRequest = useRef(0);
-  const substitutesPath = `/plan/meals/${mealId}/substitutes?food=${encodeURIComponent(foodName)}`;
+  const substitutesPath = withPlan(`/plan/meals/${mealId}/substitutes?food=${encodeURIComponent(foodName)}`);
 
   useEffect(() => {
     const dialog = dialogRef.current;

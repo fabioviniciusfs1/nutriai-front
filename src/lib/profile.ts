@@ -123,8 +123,15 @@ export function windowsOfHours(hours: number[]): EatingWindow[] {
   return windows;
 }
 
-/** Rotina e preferências alimentares: o assistente monta o plano individual a partir dela. */
-export type Routine = {
+/** Dia da semana, como `Date.getDay()` (0 = domingo). */
+export type Weekday = (typeof WEEKDAYS)[number]["id"];
+
+/** Rotina de um grupo de dias da semana: cada grupo tem o próprio plano. */
+export type RoutineSchedule = {
+  /** Número do grupo (e do plano dele); um grupo novo vai sem `id` e o backend dá o próximo. */
+  id?: number;
+  /** Dias da semana do grupo, sem repetir. */
+  days: Weekday[];
   /** Em ordem, sem sobreposição e com início antes do fim. De 1 a 12. */
   eatingWindows: EatingWindow[];
   /** "HH:MM" */
@@ -136,11 +143,17 @@ export type Routine = {
   /** "HH:MM"; pode ser antes de `trainingStart` (treino que passa da meia-noite). */
   trainingEnd: string | null;
   /**
-   * Refeições que a pessoa faz no dia, sem repetir, na ordem do dia: café da manhã, almoço e jantar sempre, mais os
-   * lanches que ela marcou (lanche da manhã, lanche da tarde, ceia).
+   * Refeições que a pessoa faz nesses dias, sem repetir, na ordem do dia: café da manhã, almoço e jantar sempre,
+   * mais os lanches que ela marcou (lanche da manhã, lanche da tarde, ceia).
    */
   meals: MealSlot[];
+};
+
+/** Rotina e preferências alimentares: o assistente monta o plano individual de cada grupo de dias a partir dela. */
+export type Routine = {
+  /** De 1 a 7 grupos; cada dia da semana fica em exatamente um. */
+  schedules: RoutineSchedule[];
   /** Dia da semana em que o app lembra de registrar o peso. */
-  weighInDay: (typeof WEEKDAYS)[number]["id"];
+  weighInDay: Weekday;
   diet: (typeof DIETS)[number]["id"];
 };

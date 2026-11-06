@@ -15,6 +15,7 @@ import type {
 } from "@/lib/api/types";
 import type { FoodFeedback } from "@/lib/food-feedback";
 import { ME_PATH } from "@/lib/auth";
+import { withPlan } from "@/lib/plan-selection";
 
 export const TODAY_PLAN_PATH = "/plan/today";
 export const RESTRICTED_FOODS_PATH = "/foods/restricted";
@@ -23,31 +24,35 @@ export const DIET_PATH = "/me/diet";
 export const CALORIES_PATH = "/me/calories";
 
 /**
- * Toda mudança no plano: o plano de hoje vem na resposta; as prévias por refeição, o consumo de hoje
- * (`/nutrition/today`, card "Meta diária") e o histórico (que inclui hoje) ficam velhos.
+ * Toda mudança no plano aberto (o de hoje ou o escolhido nas abas): ele vem na resposta; os outros planos, as
+ * prévias por refeição, o consumo de hoje (`/nutrition/today`, card "Meta diária") e o histórico (que inclui hoje)
+ * ficam velhos.
  */
 function planMutation(path: string, method: string, body?: unknown, alsoInvalidate: string[] = []) {
-  return mutate<TodayPlan>(path, method, body, {
-    update: TODAY_PLAN_PATH,
-    invalidate: ["/plan/meals/", "/nutrition", "/history", ...alsoInvalidate],
+  return mutate<TodayPlan>(withPlan(path), method, body, {
+    update: withPlan(TODAY_PLAN_PATH),
+    invalidate: [TODAY_PLAN_PATH, "/plan/meals/", "/nutrition", "/history", ...alsoInvalidate],
   });
 }
 
 /** O que o assistente acha do novo horário, sem salvar: `ok` = pode salvar direto. */
 export function checkMealTime(mealId: number, time: string) {
-  return mutate<MealTimeCheck>(`/plan/meals/${mealId}/time-check`, "POST", { time });
+  return mutate<MealTimeCheck>(withPlan(`/plan/meals/${mealId}/time-check`), "POST", { time });
 }
 
 export function changeMealTime(mealId: number, time: string) {
   return planMutation(`/plan/meals/${mealId}/time`, "PUT", { time });
 }
 
-/** Monta de novo o plano individual (depois de uma falha ou de mudar a rotina); a montagem segue em segundo plano. */
-export function personalizePlan() {
-  return planMutation("/plan/personalize", "POST");
+/**
+ * Monta de novo o plano individual (depois de uma falha ou de mudar a rotina); a montagem segue em segundo plano.
+ * `planId`: só esse plano; sem ele, todos.
+ */
+export function personalizePlan(planId?: number) {
+  return planMutation("/plan/personalize", "POST", planId === undefined ? {} : { planId });
 }
 
-/** Alimento extra: `grams` gramas fixas, que somam às calorias do dia. */
+/** Alimento extra: `grams` gramas fixas, que somam às calorias do dia (só no plano de hoje). */
 export function addFood(mealId: number, foodName: string, grams: number) {
   return planMutation(`/plan/meals/${mealId}/foods`, "POST", { foodName, grams });
 }

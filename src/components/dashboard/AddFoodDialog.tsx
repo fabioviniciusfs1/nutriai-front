@@ -5,6 +5,7 @@ import { Search } from "lucide-react";
 import { ApiError, apiFetch } from "@/lib/api/client";
 import type { FoodSearchResult, PlanFood } from "@/lib/api/types";
 import { FOOD_FEEDBACK } from "@/lib/food-feedback";
+import { withPlan } from "@/lib/plan-selection";
 
 /** Limites das gramas do alimento extra (os mesmos da API). */
 const MIN_GRAMS = 1;
@@ -65,7 +66,7 @@ export function AddFoodDialog({ mealId, onConfirm, onCancel }: AddFoodDialogProp
     const timer = setTimeout(async () => {
       try {
         const food = await apiFetch<PlanFood>(
-          `/plan/meals/${mealId}/food-portion?food=${encodeURIComponent(choice)}&grams=${grams}`,
+          withPlan(`/plan/meals/${mealId}/food-portion?food=${encodeURIComponent(choice)}&grams=${grams}`),
         );
         if (!cancelled) setPreview(food);
       } catch (previewError) {
@@ -92,7 +93,7 @@ export function AddFoodDialog({ mealId, onConfirm, onCancel }: AddFoodDialogProp
     setBusy(true);
     setError(null);
     try {
-      const found = await apiFetch<FoodSearchResult>(`/plan/meals/${mealId}/food-search?q=${encodeURIComponent(query)}`);
+      const found = await apiFetch<FoodSearchResult>(withPlan(`/plan/meals/${mealId}/food-search?q=${encodeURIComponent(query)}`));
       setResult({ ...found, query });
       choose(found.found && found.options.length === 1 ? found.options[0].food : null);
       // Busca nova: a lista volta ao começo.
