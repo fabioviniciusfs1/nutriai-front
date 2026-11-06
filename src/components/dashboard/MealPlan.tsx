@@ -14,7 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { FoodFeedback } from "@/lib/food-feedback";
-import type { PlanMeal, TodayPlan } from "@/lib/api/types";
+import type { FoodSearchOption, PlanMeal, TodayPlan } from "@/lib/api/types";
 import { mealSlotLabel, type MealSlot } from "@/lib/profile";
 import { invalidate, useApiQuery } from "@/lib/api/query";
 import {
@@ -195,8 +195,8 @@ function MealPlanView({ plan, tabs }: { plan: TodayPlan; tabs: React.ReactNode }
     if (pending && (await swapFood(pending.mealId, pending.foodName, reason, substitute))) setPending(null);
   }
 
-  async function confirmAddFood(foodName: string, grams: number) {
-    if (addingFoodTo !== null && (await addFood(addingFoodTo, foodName, grams))) setAddingFoodTo(null);
+  async function confirmAddFood(option: FoodSearchOption, grams: number) {
+    if (addingFoodTo !== null && (await addFood(addingFoodTo, option, grams))) setAddingFoodTo(null);
   }
 
   async function saveTime(meal: EditingTime, value: string) {

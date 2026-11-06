@@ -8,6 +8,7 @@ import type {
   DietEstimateRequest,
   DietPreview,
   DietSettings,
+  FoodSearchOption,
   MealTimeCheck,
   RestrictedFood,
   TodayPlan,
@@ -53,8 +54,9 @@ export function personalizePlan(planId?: number) {
 }
 
 /** Alimento extra: `grams` gramas fixas, que somam às calorias do dia (só no plano de hoje). */
-export function addFood(mealId: number, foodName: string, grams: number) {
-  return planMutation(`/plan/meals/${mealId}/foods`, "POST", { foodName, grams });
+export function addFood(mealId: number, option: FoodSearchOption, grams: number) {
+  const food = option.barcode ? { barcode: option.barcode } : { foodName: option.food.name };
+  return planMutation(`/plan/meals/${mealId}/foods`, "POST", { ...food, grams });
 }
 
 export function removeExtraFood(mealId: number, extraId: string) {
