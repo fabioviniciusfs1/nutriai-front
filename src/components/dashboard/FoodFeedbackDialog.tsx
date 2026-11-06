@@ -10,15 +10,13 @@ import { withPlan } from "@/lib/plan-selection";
 
 /** Quantos nomes já mostrados o backend aceita no "Ver mais"; com isso na tela, o botão some. */
 const MAX_SHOWN_SUBSTITUTES = 64;
-/** Escolha "Sem substituto": o alimento sai sem outro no lugar. */
-const NO_SUBSTITUTE = "";
 
 type FoodFeedbackDialogProps = {
   /** Refeição onde o botão foi clicado ("Não quero" troca só nela); `null` = diálogo fechado. */
   mealId: number | null;
   foodName: string;
   mealTitle: string;
-  onConfirm: (reason: FoodFeedback, substitute: string | null) => Promise<void>;
+  onConfirm: (reason: FoodFeedback, substitute: string) => Promise<void>;
   onCancel: () => void;
 };
 
@@ -71,8 +69,8 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
       setMode(nextMode);
       setOptions([]);
       setExhausted(false);
-      // Um alimento da lista anterior sai junto com ela; "Sem substituto" continua escolhido.
-      setChoice((current) => (current === NO_SUBSTITUTE ? current : null));
+      // Um alimento da lista anterior sai junto com ela.
+      setChoice(null);
       // Lista nova: volta ao começo ("Ver mais" mantém a posição). No celular o diálogo inteiro rola: traz a
       // lista para a tela depois que ela ganha altura.
       listRef.current?.scrollTo({ top: 0 });
@@ -135,7 +133,7 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
           event.preventDefault();
           if (!reason || choice === null) return;
           setSubmitting(true);
-          await onConfirm(reason, choice === NO_SUBSTITUTE ? null : choice);
+          await onConfirm(reason, choice);
           setSubmitting(false);
         }}
       >
@@ -215,24 +213,6 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
         >
           <fieldset className="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2">
             <legend className="sr-only">Substituto</legend>
-            <label
-              className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${
-                choice === NO_SUBSTITUTE ? "border-accent bg-accent/5" : "border-neutral-200 hover:bg-neutral-50"
-              }`}
-            >
-              <input
-                type="radio"
-                name="food-substitute"
-                value={NO_SUBSTITUTE}
-                checked={choice === NO_SUBSTITUTE}
-                onChange={() => setChoice(NO_SUBSTITUTE)}
-                className="h-4 w-4 shrink-0 accent-accent"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-neutral-900">Sem substituto</span>
-                <span className="mt-0.5 block text-xs text-neutral-500">O alimento sai sem outro no lugar.</span>
-              </span>
-            </label>
             {options.map((option) => (
               <label
                 key={option.name}

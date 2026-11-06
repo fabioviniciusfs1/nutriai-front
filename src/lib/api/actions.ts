@@ -61,8 +61,8 @@ export function removeExtraFood(mealId: number, extraId: string) {
   return planMutation(`/plan/meals/${mealId}/foods/${encodeURIComponent(extraId)}`, "DELETE");
 }
 
-/** "Substituir alimento": `substitute` `null` = sai sem substituto. */
-export function swapFood(mealId: number, foodName: string, reason: FoodFeedback, substitute: string | null) {
+/** "Substituir alimento": o alimento sai com `substitute` no lugar. */
+export function swapFood(mealId: number, foodName: string, reason: FoodFeedback, substitute: string) {
   return planMutation(`/plan/meals/${mealId}/swaps`, "POST", { foodName, reason, substitute }, [RESTRICTED_FOODS_PATH]);
 }
 

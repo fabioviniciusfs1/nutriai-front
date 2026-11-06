@@ -191,7 +191,7 @@ function MealPlanView({ plan, tabs }: { plan: TodayPlan; tabs: React.ReactNode }
   const addingFoodMeal = plan.meals.find((meal) => meal.id === addingFoodTo);
 
   // Os diálogos só fecham se o backend aceitou; se falhar, o aviso de erro aparece e dá para tentar de novo.
-  async function confirmFeedback(reason: FoodFeedback, substitute: string | null) {
+  async function confirmFeedback(reason: FoodFeedback, substitute: string) {
     if (pending && (await swapFood(pending.mealId, pending.foodName, reason, substitute))) setPending(null);
   }
 
