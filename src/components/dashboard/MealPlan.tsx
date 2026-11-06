@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowLeftRight, Clock, Flame, Wheat, Drumstick, Droplet, PlusCircle, Trash2 } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  ArrowLeftRight,
+  ChartGantt,
+  Clock,
+  Flame,
+  Wheat,
+  Drumstick,
+  Droplet,
+  List,
+  PlusCircle,
+  Trash2,
+} from "lucide-react";
 import type { FoodFeedback } from "@/lib/food-feedback";
-import type { TodayPlan } from "@/lib/api/types";
+import type { PlanMeal, TodayPlan } from "@/lib/api/types";
 import { mealSlotLabel, type MealSlot } from "@/lib/profile";
 import { invalidate, useApiQuery } from "@/lib/api/query";
 import {
@@ -20,6 +31,7 @@ import { FoodFeedbackDialog } from "@/components/dashboard/FoodFeedbackDialog";
 import { MealTimeAdviceDialog } from "@/components/dashboard/MealTimeAdviceDialog";
 import { TimePickerDialog } from "@/components/dashboard/TimePickerDialog";
 import { AddFoodDialog } from "@/components/dashboard/AddFoodDialog";
+import { MealTimeline } from "@/components/dashboard/MealTimeline";
 import { daysLabel, selectPlan, useSelectedPlan, withPlan } from "@/lib/plan-selection";
 
 /**
@@ -127,10 +139,39 @@ function PersonalizationNotice({ plan }: { plan: TodayPlan }) {
   );
 }
 
+/** Lista das refeições ou linha do tempo do dia; a escolha fica salva no navegador. */
+type PlanView = "lista" | "linha";
+
+const VIEW_KEY = "nutriai.mealPlanView";
+
+const viewListeners = new Set<() => void>();
+
+function useView(): [PlanView, (view: PlanView) => void] {
+  const view = useSyncExternalStore(
+    (listener) => {
+      viewListeners.add(listener);
+      return () => viewListeners.delete(listener);
+    },
+    (): PlanView => (localStorage.getItem(VIEW_KEY) === "linha" ? "linha" : "lista"),
+    (): PlanView => "lista"
+  );
+  return [
+    view,
+    (next) => {
+      localStorage.setItem(VIEW_KEY, next);
+      for (const listener of viewListeners) listener();
+    },
+  ];
+}
+
 /** Refeição cujo horário está sendo mudado. */
 type EditingTime = { id: number; slot: MealSlot; title: string; time: string };
 
+/** Alimento sendo substituído. */
+type PendingSwap = { mealId: number; mealTitle: string; foodName: string };
+
 function MealPlanView({ plan, tabs }: { plan: TodayPlan; tabs: React.ReactNode }) {
+  const [view, setView] = useView();
   const [time, setTime] = useState("Todos");
   const [editingTime, setEditingTime] = useState<EditingTime | null>(null);
   // Conferindo o novo horário com o assistente antes de salvar.
@@ -140,7 +181,7 @@ function MealPlanView({ plan, tabs }: { plan: TodayPlan; tabs: React.ReactNode }
     (EditingTime & { chosen: string; message: string; suggestedTime: string | null; canKeep: boolean }) | null
   >(null);
   const [addingFoodTo, setAddingFoodTo] = useState<number | null>(null);
-  const [pending, setPending] = useState<{ mealId: number; mealTitle: string; foodName: string } | null>(null);
+  const [pending, setPending] = useState<PendingSwap | null>(null);
 
   const mealTimes = ["Todos", ...new Set(plan.meals.map((meal) => meal.time))];
   // Se nenhuma refeição tem mais o horário do filtro ativo, volta para "Todos".
@@ -194,10 +235,34 @@ function MealPlanView({ plan, tabs }: { plan: TodayPlan; tabs: React.ReactNode }
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
-      <h3 className="font-semibold text-neutral-900">Plano Alimentar</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-semibold text-neutral-900">Plano Alimentar</h3>
+        <div className="flex gap-1" role="group" aria-label="Visualização">
+          {(
+            [
+              { id: "lista", label: "Lista", icon: List },
+              { id: "linha", label: "Linha do tempo", icon: ChartGantt },
+            ] as const
+          ).map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={view === id}
+              title={label}
+              onClick={() => setView(id)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                view === id ? "bg-accent text-white" : "bg-accent/15 text-accent hover:bg-accent/25"
+              }`}
+            >
+              <Icon size={14} />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
       {tabs}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className={`mt-4 flex flex-wrap gap-2 ${view === "linha" ? "hidden" : ""}`}>
         {mealTimes.map((item) => (
           <button
             key={item}
@@ -220,138 +285,36 @@ function MealPlanView({ plan, tabs }: { plan: TodayPlan; tabs: React.ReactNode }
         <p className="mt-4 text-sm text-neutral-400">Nenhuma refeição neste plano.</p>
       )}
 
-      <ul className="mt-4 flex flex-col gap-4">
-        {meals.map((meal) => {
-          const { totals } = meal;
+      {view === "linha" && plan.meals.length > 0 && (
+        <MealTimeline
+          // Cada plano abre a linha do tempo de novo (centrada e com a refeição escolhida dele).
+          key={plan.plan.id}
+          meals={plan.meals}
+          active={plan.plan.active}
+          renderMeal={(meal) => (
+            <MealCard
+              meal={meal}
+              canAddFood={plan.plan.active}
+              onEditTime={setEditingTime}
+              onAddFood={setAddingFoodTo}
+              onSwap={setPending}
+            />
+          )}
+        />
+      )}
 
-          return (
-            <li key={meal.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-wide text-accent">{mealSlotLabel(meal.slot)}</p>
-                  <p className="font-semibold text-neutral-900">{meal.title}</p>
-                </div>
-                <button
-                  type="button"
-                  title="Alterar horário da refeição"
-                  aria-label={`Horário da refeição: ${meal.title}, ${meal.time}. Alterar`}
-                  onClick={() => setEditingTime({ id: meal.id, slot: meal.slot, title: meal.title, time: meal.time })}
-                  className="flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
-                >
-                  <Clock size={12} /> {meal.time}
-                </button>
-                {/* Na mesma coluna (e do mesmo tamanho) que o botão de substituir de cada alimento. O extra vale
-                    só no dia em que entrou: só no plano de hoje. */}
-                <div className="ml-auto flex w-[3.75rem] justify-start">
-                  {plan.plan.active && (
-                    <button
-                      type="button"
-                      title="Adicionar alimento extra"
-                      aria-label={`Adicionar alimento extra: ${meal.title}`}
-                      onClick={() => setAddingFoodTo(meal.id)}
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
-                    >
-                      <PlusCircle size={15} />
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-500">
-                <span className="flex items-center gap-1">
-                  <Flame size={14} /> {totals.kcal} kcal
-                </span>
-                <span className="flex items-center gap-1">
-                  <Wheat size={14} /> {totals.carbs}g carboidratos
-                </span>
-                <span className="flex items-center gap-1">
-                  <Drumstick size={14} /> {totals.protein}g proteína
-                </span>
-                <span className="flex items-center gap-1">
-                  <Droplet size={14} /> {totals.fat}g gorduras
-                </span>
-              </div>
-
-              <div className="mt-4">
-                <div className="hidden sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] gap-2 border-b border-neutral-200 pb-2 text-xs font-medium text-neutral-400 sm:grid">
-                  <span>Alimento</span>
-                  <span>Quantidade</span>
-                  <span>Carb.</span>
-                  <span>Prot.</span>
-                  <span>Gord.</span>
-                  <span>Kcal</span>
-                  <span className="w-[3.75rem]" aria-hidden />
-                </div>
-                {meal.foods.map((food, index) => {
-                  const { extraId } = food;
-                  return (
-                    <div
-                      // Com substituições, o mesmo alimento pode aparecer duas vezes na refeição.
-                      key={`${index}-${food.name}`}
-                      className="grid grid-cols-[repeat(4,minmax(0,1fr))_auto] gap-x-2 gap-y-2 border-b border-neutral-200 py-3 text-sm text-neutral-700 last:border-b-0 sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] sm:items-center sm:py-2"
-                    >
-                      <span className="col-span-4 font-medium text-neutral-900 sm:col-span-1 sm:font-normal sm:text-neutral-700">
-                        {food.name}
-                      </span>
-                      <span className="text-right text-neutral-500 sm:text-left">
-                        {/* Ovo: `grams` = unidades × peso da unidade. */}
-                        {food.units !== undefined ? (
-                          <>
-                            {food.units} {food.units === 1 ? "ovo" : "ovos"}
-                            <span className="block text-xs text-neutral-400">{food.grams / food.units} g/unid.</span>
-                          </>
-                        ) : (
-                          `${food.grams} g`
-                        )}
-                      </span>
-                      <span className="flex flex-col sm:block">
-                        <span className="text-xs text-neutral-400 sm:hidden">Carb.</span>
-                        {food.carbs}g
-                      </span>
-                      <span className="flex flex-col sm:block">
-                        <span className="text-xs text-neutral-400 sm:hidden">Prot.</span>
-                        {food.protein}g
-                      </span>
-                      <span className="flex flex-col sm:block">
-                        <span className="text-xs text-neutral-400 sm:hidden">Gord.</span>
-                        {food.fat}g
-                      </span>
-                      <span className="flex flex-col sm:block">
-                        <span className="text-xs text-neutral-400 sm:hidden">Kcal</span>
-                        {food.kcal}
-                      </span>
-                      {/* No celular, os botões ficam à direita dos nutrientes, na mesma linha; a coluna tem largura fixa
-                          para o de substituir ficar alinhado em todas as linhas e com o de adicionar alimento. */}
-                      <div className="flex w-[3.75rem] items-center gap-1">
-                        <button
-                          type="button"
-                          title="Substituir alimento"
-                          aria-label={`Substituir alimento: ${food.name}`}
-                          onClick={() =>
-                            setPending({ mealId: meal.id, mealTitle: meal.title, foodName: food.name })
-                          }
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
-                        >
-                          <ArrowLeftRight size={15} />
-                        </button>
-                        {extraId !== null && (
-                          <button
-                            type="button"
-                            title="Remover alimento"
-                            aria-label={`Remover alimento: ${food.name}`}
-                            onClick={() => void removeExtraFood(meal.id, extraId)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </li>
-          );
-        })}
+      <ul className={`mt-4 flex flex-col gap-4 ${view === "linha" ? "hidden" : ""}`}>
+        {meals.map((meal) => (
+          <li key={meal.id}>
+            <MealCard
+              meal={meal}
+              canAddFood={plan.plan.active}
+              onEditTime={setEditingTime}
+              onAddFood={setAddingFoodTo}
+              onSwap={setPending}
+            />
+          </li>
+        ))}
       </ul>
 
       <TimePickerDialog
@@ -388,6 +351,149 @@ function MealPlanView({ plan, tabs }: { plan: TodayPlan; tabs: React.ReactNode }
         onConfirm={confirmFeedback}
         onCancel={() => setPending(null)}
       />
+    </div>
+  );
+}
+
+/** Uma refeição do plano: tipo, título, horário, totais e alimentos, com as ações de cada um. */
+function MealCard({
+  meal,
+  canAddFood,
+  onEditTime,
+  onAddFood,
+  onSwap,
+}: {
+  meal: PlanMeal;
+  /** O alimento extra vale só no dia em que entrou: só no plano de hoje. */
+  canAddFood: boolean;
+  onEditTime: (meal: EditingTime) => void;
+  onAddFood: (mealId: number) => void;
+  onSwap: (pending: PendingSwap) => void;
+}) {
+  const { totals } = meal;
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-accent">{mealSlotLabel(meal.slot)}</p>
+          <p className="font-semibold text-neutral-900">{meal.title}</p>
+        </div>
+        <button
+          type="button"
+          title="Alterar horário da refeição"
+          aria-label={`Horário da refeição: ${meal.title}, ${meal.time}. Alterar`}
+          onClick={() => onEditTime({ id: meal.id, slot: meal.slot, title: meal.title, time: meal.time })}
+          className="flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
+        >
+          <Clock size={12} /> {meal.time}
+        </button>
+        {/* Na mesma coluna (e do mesmo tamanho) que o botão de substituir de cada alimento. O extra vale
+            só no dia em que entrou: só no plano de hoje. */}
+        <div className="ml-auto flex w-[3.75rem] justify-start">
+          {canAddFood && (
+            <button
+              type="button"
+              title="Adicionar alimento extra"
+              aria-label={`Adicionar alimento extra: ${meal.title}`}
+              onClick={() => onAddFood(meal.id)}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
+            >
+              <PlusCircle size={15} />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-500">
+        <span className="flex items-center gap-1">
+          <Flame size={14} /> {totals.kcal} kcal
+        </span>
+        <span className="flex items-center gap-1">
+          <Wheat size={14} /> {totals.carbs}g carboidratos
+        </span>
+        <span className="flex items-center gap-1">
+          <Drumstick size={14} /> {totals.protein}g proteína
+        </span>
+        <span className="flex items-center gap-1">
+          <Droplet size={14} /> {totals.fat}g gorduras
+        </span>
+      </div>
+
+      <div className="mt-4">
+        <div className="hidden sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] gap-2 border-b border-neutral-200 pb-2 text-xs font-medium text-neutral-400 sm:grid">
+          <span>Alimento</span>
+          <span>Quantidade</span>
+          <span>Carb.</span>
+          <span>Prot.</span>
+          <span>Gord.</span>
+          <span>Kcal</span>
+          <span className="w-[3.75rem]" aria-hidden />
+        </div>
+        {meal.foods.map((food, index) => {
+          const { extraId } = food;
+          return (
+            <div
+              // Com substituições, o mesmo alimento pode aparecer duas vezes na refeição.
+              key={`${index}-${food.name}`}
+              className="grid grid-cols-[repeat(4,minmax(0,1fr))_auto] gap-x-2 gap-y-2 border-b border-neutral-200 py-3 text-sm text-neutral-700 last:border-b-0 sm:grid-cols-[2fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto] sm:items-center sm:py-2"
+            >
+              <span className="col-span-4 font-medium text-neutral-900 sm:col-span-1 sm:font-normal sm:text-neutral-700">
+                {food.name}
+              </span>
+              <span className="text-right text-neutral-500 sm:text-left">
+                {/* Ovo: `grams` = unidades × peso da unidade. */}
+                {food.units !== undefined ? (
+                  <>
+                    {food.units} {food.units === 1 ? "ovo" : "ovos"}
+                    <span className="block text-xs text-neutral-400">{food.grams / food.units} g/unid.</span>
+                  </>
+                ) : (
+                  `${food.grams} g`
+                )}
+              </span>
+              <span className="flex flex-col sm:block">
+                <span className="text-xs text-neutral-400 sm:hidden">Carb.</span>
+                {food.carbs}g
+              </span>
+              <span className="flex flex-col sm:block">
+                <span className="text-xs text-neutral-400 sm:hidden">Prot.</span>
+                {food.protein}g
+              </span>
+              <span className="flex flex-col sm:block">
+                <span className="text-xs text-neutral-400 sm:hidden">Gord.</span>
+                {food.fat}g
+              </span>
+              <span className="flex flex-col sm:block">
+                <span className="text-xs text-neutral-400 sm:hidden">Kcal</span>
+                {food.kcal}
+              </span>
+              {/* No celular, os botões ficam à direita dos nutrientes, na mesma linha; a coluna tem largura fixa
+                  para o de substituir ficar alinhado em todas as linhas e com o de adicionar alimento. */}
+              <div className="flex w-[3.75rem] items-center gap-1">
+                <button
+                  type="button"
+                  title="Substituir alimento"
+                  aria-label={`Substituir alimento: ${food.name}`}
+                  onClick={() => onSwap({ mealId: meal.id, mealTitle: meal.title, foodName: food.name })}
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
+                >
+                  <ArrowLeftRight size={15} />
+                </button>
+                {extraId !== null && (
+                  <button
+                    type="button"
+                    title="Remover alimento"
+                    aria-label={`Remover alimento: ${food.name}`}
+                    onClick={() => void removeExtraFood(meal.id, extraId)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent transition-colors hover:bg-accent/25"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
