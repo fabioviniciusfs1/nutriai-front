@@ -5,13 +5,12 @@ import { useRouter } from "next/navigation";
 import { saveRoutine, useAuth } from "@/lib/auth";
 import { personalizePlan } from "@/lib/api/actions";
 import {
-  DAY_PERIODS,
   DIETS,
+  MAIN_MEAL_SLOTS,
   MEAL_SLOTS,
   WEEKDAYS,
   type MealSlot,
   type BusyTimes,
-  type DayPeriod,
   type Routine,
   hoursOfWindows,
   unavailableHours,
@@ -38,10 +37,8 @@ function oneHourLater(time: string) {
   return `${String((Number(time.slice(0, 2)) + 1) % 24).padStart(2, "0")}:${time.slice(3)}`;
 }
 
-/** Resposta às perguntas de fome: um período do dia ou "Não sinto". */
-type HungerAnswer = DayPeriod | "nenhum";
-
-const HUNGER_OPTIONS: { id: HungerAnswer; label: string }[] = [...DAY_PERIODS, { id: "nenhum", label: "Não sinto" }];
+/** Os lanches entre as refeições principais: os únicos que a pessoa escolhe. */
+const SNACK_SLOTS = MEAL_SLOTS.filter((slot) => !MAIN_MEAL_SLOTS.includes(slot.id));
 
 type Picking = { title: string; value: string; onConfirm: (value: string) => void };
 
@@ -74,11 +71,9 @@ export function RoutineForm() {
   // Horas (0 a 23) em que a pessoa disse que pode comer; as do sono e do treino não contam. No cadastro,
   // nenhuma: a pessoa marca as dela.
   const [allowed, setAllowed] = useState<number[]>(() => (saved ? hoursOfWindows(saved.eatingWindows) : []));
-  const [meals, setMeals] = useState<MealSlot[]>(saved?.meals ?? []);
-  // `null` = ainda sem resposta (só no cadastro); "nenhum" = "Não sinto", salvo como `null`.
-  const [hungriest, setHungriest] = useState<HungerAnswer | null>(saved ? (saved.hungriestPeriod ?? "nenhum") : null);
-  const [leastHungry, setLeastHungry] = useState<HungerAnswer | null>(
-    saved ? (saved.leastHungryPeriod ?? "nenhum") : null
+  // Só os lanches marcados; as refeições principais entram sempre.
+  const [snacks, setSnacks] = useState<MealSlot[]>(
+    saved?.meals.filter((slot) => !MAIN_MEAL_SLOTS.includes(slot)) ?? []
   );
   const [weighInDay, setWeighInDay] = useState<Routine["weighInDay"] | null>(saved?.weighInDay ?? null);
   const [diet, setDiet] = useState<Routine["diet"] | null>(saved?.diet ?? null);
@@ -91,25 +86,20 @@ export function RoutineForm() {
   const busyHours = unavailableHours(busyTimes(times, trains));
   const hours = HOURS.filter((hour) => !busyHours.includes(hour) && allowed.includes(hour));
   const sameTraining = trains === true && times.trainingStart === times.trainingEnd;
-  const samePeriod = hungriest !== null && hungriest !== "nenhum" && hungriest === leastHungry;
 
   const routine: Routine | null =
     hours.length > 0 &&
     trains !== null &&
     !sameTraining &&
-    meals.length > 0 &&
-    hungriest !== null &&
-    leastHungry !== null &&
-    !samePeriod &&
     weighInDay !== null &&
     diet !== null
       ? {
           eatingWindows: windowsOfHours(hours),
           ...busyTimes(times, trains),
           // Na ordem do dia, não na que foram marcadas.
-          meals: MEAL_SLOTS.map((slot) => slot.id).filter((id) => meals.includes(id)),
-          hungriestPeriod: hungriest === "nenhum" ? null : hungriest,
-          leastHungryPeriod: leastHungry === "nenhum" ? null : leastHungry,
+          meals: MEAL_SLOTS.map((slot) => slot.id).filter(
+            (id) => MAIN_MEAL_SLOTS.includes(id) || snacks.includes(id)
+          ),
           weighInDay,
           diet,
         }
@@ -276,66 +266,27 @@ export function RoutineForm() {
           <section className="rounded-2xl bg-white p-5 shadow-sm">
             <h3 className="font-semibold text-neutral-900">Refeições</h3>
 
-            <fieldset className="mt-4" data-invalid={showErrors && meals.length === 0 ? true : undefined}>
-              <legend className="text-sm font-medium text-neutral-700">Refeições por dia</legend>
-              <p className="text-xs text-neutral-500">Marque as refeições que você faz no dia.</p>
+            <fieldset className="mt-4">
+              <legend className="text-sm font-medium text-neutral-700">Lanches</legend>
+              <p className="text-xs text-neutral-500">
+                Seu plano tem café da manhã, almoço e janta. Marque os lanches que você faz entre eles.
+              </p>
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {MEAL_SLOTS.map((slot) => (
+                {SNACK_SLOTS.map((slot) => (
                   <OptionCard
                     key={slot.id}
                     type="checkbox"
                     name="meals"
                     label={slot.label}
-                    checked={meals.includes(slot.id)}
+                    checked={snacks.includes(slot.id)}
                     onChange={() =>
-                      setMeals((current) =>
+                      setSnacks((current) =>
                         current.includes(slot.id) ? current.filter((id) => id !== slot.id) : [...current, slot.id]
                       )
                     }
                   />
                 ))}
               </div>
-              {showErrors && meals.length === 0 && (
-                <p className="mt-1 text-xs text-red-600">Marque pelo menos uma refeição</p>
-              )}
-            </fieldset>
-
-            <fieldset className="mt-4" data-invalid={showErrors && hungriest === null ? true : undefined}>
-              <legend className="text-sm font-medium text-neutral-700">Período em que sinto mais fome</legend>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {HUNGER_OPTIONS.map((period) => (
-                  <OptionCard
-                    key={period.id}
-                    name="hungriestPeriod"
-                    label={period.label}
-                    checked={hungriest === period.id}
-                    onChange={() => setHungriest(period.id)}
-                  />
-                ))}
-              </div>
-              {required(hungriest === null)}
-            </fieldset>
-
-            <fieldset
-              className="mt-4"
-              data-invalid={showErrors && (leastHungry === null || samePeriod) ? true : undefined}
-            >
-              <legend className="text-sm font-medium text-neutral-700">Período em que sinto menos fome</legend>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {HUNGER_OPTIONS.map((period) => (
-                  <OptionCard
-                    key={period.id}
-                    name="leastHungryPeriod"
-                    label={period.label}
-                    checked={leastHungry === period.id}
-                    onChange={() => setLeastHungry(period.id)}
-                  />
-                ))}
-              </div>
-              {required(leastHungry === null)}
-              {showErrors && samePeriod && (
-                <p className="mt-1 text-xs text-red-600">Escolha um período diferente do de mais fome</p>
-              )}
             </fieldset>
 
             <fieldset className="mt-4" data-invalid={showErrors && weighInDay === null ? true : undefined}>
@@ -383,7 +334,7 @@ export function RoutineForm() {
           <p className="mt-2 text-sm text-neutral-500">
             {saved
               ? "O plano atual continua como está. Depois de salvar, você escolhe se o assistente monta um novo com a rotina alterada."
-              : "Com sua rotina, o assistente monta um plano alimentar feito para você: as refeições nos horários em que você pode comer, maiores quando você sente mais fome."}
+              : "Com sua rotina, o assistente monta um plano alimentar feito para você: as refeições nos horários em que você pode comer, com as calorias divididas ao longo do dia."}
           </p>
 
           <button

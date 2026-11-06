@@ -18,7 +18,7 @@ export const GOALS = [
   { id: "ganhar", label: "Ganhar peso", description: "Superávit de 300 kcal/dia" },
 ] as const;
 
-/** Refeições do dia, na ordem em que acontecem; a pessoa marca as que faz. */
+/** Refeições do dia, na ordem em que acontecem: as principais sempre; a pessoa marca os lanches. */
 export const MEAL_SLOTS = [
   { id: "cafe-da-manha", label: "Café da manhã" },
   { id: "lanche-da-manha", label: "Lanche da manhã" },
@@ -26,13 +26,6 @@ export const MEAL_SLOTS = [
   { id: "lanche-da-tarde", label: "Lanche da tarde" },
   { id: "jantar", label: "Janta" },
   { id: "ceia", label: "Ceia" },
-] as const;
-
-/** Períodos do dia (o backend usa os mesmos: manhã até 10:59, tarde até 16:59, noite depois). */
-export const DAY_PERIODS = [
-  { id: "manha", label: "Manhã" },
-  { id: "tarde", label: "Tarde" },
-  { id: "noite", label: "Noite" },
 ] as const;
 
 /** Tipo de alimentação: o backend tira do plano e das sugestões o que a dieta exclui. */
@@ -71,7 +64,9 @@ export type MealSlot = (typeof MEAL_SLOTS)[number]["id"];
 export function mealSlotLabel(slot: MealSlot) {
   return MEAL_SLOTS.find((item) => item.id === slot)!.label;
 }
-export type DayPeriod = (typeof DAY_PERIODS)[number]["id"];
+
+/** As refeições que todo plano tem, uma por período do dia (o backend acrescenta se faltarem). */
+export const MAIN_MEAL_SLOTS: MealSlot[] = ["cafe-da-manha", "almoco", "jantar"];
 
 /** Janela em que dá para comer, "HH:MM". */
 export type EatingWindow = { start: string; end: string };
@@ -140,12 +135,11 @@ export type Routine = {
   trainingStart: string | null;
   /** "HH:MM"; pode ser antes de `trainingStart` (treino que passa da meia-noite). */
   trainingEnd: string | null;
-  /** Refeições que a pessoa faz no dia: pelo menos uma, sem repetir, na ordem do dia. */
+  /**
+   * Refeições que a pessoa faz no dia, sem repetir, na ordem do dia: café da manhã, almoço e jantar sempre, mais os
+   * lanches que ela marcou (lanche da manhã, lanche da tarde, ceia).
+   */
   meals: MealSlot[];
-  /** Período do dia em que sente mais fome; `null` = não sente mais fome em nenhum ("Não sinto"). */
-  hungriestPeriod: DayPeriod | null;
-  /** Período do dia em que sente menos fome (diferente de `hungriestPeriod`); `null` = "Não sinto". */
-  leastHungryPeriod: DayPeriod | null;
   /** Dia da semana em que o app lembra de registrar o peso. */
   weighInDay: (typeof WEEKDAYS)[number]["id"];
   diet: (typeof DIETS)[number]["id"];
