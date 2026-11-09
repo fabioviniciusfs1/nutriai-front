@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NutriAI | Painel",
+  title: "Alere | Painel",
   description: "Painel de acompanhamento nutricional e de treinos com IA.",
 };
 

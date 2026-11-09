@@ -3,7 +3,7 @@ import { AuthGuard } from "@/components/auth/AuthGuard";
 import { GoogleConnectCallback } from "@/components/profile/GoogleConnectCallback";
 
 export const metadata: Metadata = {
-  title: "NutriAI | Conectar Google",
+  title: "Alere | Conectar Google",
 };
 
 export default function GoogleConnectPage() {

@@ -61,7 +61,7 @@ export function Topbar() {
       </button>
 
       <Link href="/" className="text-lg font-bold text-accent md:justify-self-start">
-        NutriAI
+        Alere
       </Link>
 
       <nav className="hidden md:flex md:items-center md:justify-center md:gap-2">

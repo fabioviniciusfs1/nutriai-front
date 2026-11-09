@@ -75,7 +75,7 @@ export function LoginForm() {
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10">
           <span className="text-2xl">🌱</span>
         </div>
-        <h1 className="mt-3 text-xl font-semibold text-neutral-900">NutriAI</h1>
+        <h1 className="mt-3 text-xl font-semibold text-neutral-900">Alere</h1>
         <p className="mt-1 text-sm text-neutral-500">
           {mode === "entrar" ? "Entre para acessar seu plano alimentar" : "Crie sua conta para começar"}
         </p>

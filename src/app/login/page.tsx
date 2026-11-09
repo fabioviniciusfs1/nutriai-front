@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LoginForm } from "@/components/auth/LoginForm";
 
 export const metadata: Metadata = {
-  title: "NutriAI | Entrar",
+  title: "Alere | Entrar",
 };
 
 export default function LoginPage() {

@@ -87,7 +87,7 @@ export function GoogleHealthCard() {
       <ConfirmDialog
         open={confirmingDisconnect}
         title="Desconectar o Google?"
-        description="O NutriAI para de importar seus dados do Google Health. Os dados já importados continuam no histórico."
+        description="O Alere para de importar seus dados do Google Health. Os dados já importados continuam no histórico."
         confirmLabel="Desconectar"
         onConfirm={() => {
           setConfirmingDisconnect(false);
