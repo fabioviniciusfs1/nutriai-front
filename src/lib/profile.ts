@@ -13,9 +13,9 @@ export const ACTIVITY_LEVELS = [
 ] as const;
 
 export const GOALS = [
-  { id: "perder", label: "Perder peso", description: "Déficit de 500 kcal/dia (cerca de 0,5 kg por semana)" },
+  { id: "perder", label: "Emagrecimento", description: "Déficit de 500 kcal/dia (cerca de 0,5 kg por semana)" },
   { id: "manter", label: "Manter peso", description: "Consumo igual ao gasto diário" },
-  { id: "ganhar", label: "Ganhar peso", description: "Superávit de 300 kcal/dia" },
+  { id: "ganhar", label: "Aumento de massa magra", description: "Superávit de 300 kcal/dia (cerca de 0,3 kg por semana)" },
 ] as const;
 
 /** Refeições do dia, na ordem em que acontecem: as principais sempre; a pessoa marca os lanches. */
