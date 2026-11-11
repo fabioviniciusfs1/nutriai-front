@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search, Sparkles } from "lucide-react";
 import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
 import { ApiError, apiFetch } from "@/lib/api/client";
-import type { PlanFood } from "@/lib/api/types";
+import type { AvoidOption, PlanFood } from "@/lib/api/types";
 import { Spinner } from "@/components/api/QueryStatus";
 import { withPlan } from "@/lib/plan-selection";
 
@@ -16,7 +16,8 @@ type FoodFeedbackDialogProps = {
   mealId: number | null;
   foodName: string;
   mealTitle: string;
-  onConfirm: (reason: FoodFeedback, substitute: string) => Promise<void>;
+  /** `avoidKind`: a pessoa marcou "Não como nenhum tipo de …" junto do "Não gosto" (vira uma regra do "não como"). */
+  onConfirm: (reason: FoodFeedback, substitute: string, avoidKind: AvoidOption | null) => Promise<void>;
   onCancel: () => void;
 };
 
@@ -38,6 +39,9 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exhausted, setExhausted] = useState(false);
+  // O tipo do alimento ("Cenoura"), para o "Não gosto" oferecer tirar todos os preparos dele.
+  const [kind, setKind] = useState<AvoidOption | null>(null);
+  const [avoidAll, setAvoidAll] = useState(false);
   // Só a resposta do último pedido vale (o usuário pode pesquisar de novo antes de a anterior chegar).
   const lastRequest = useRef(0);
   const substitutesPath = withPlan(`/plan/meals/${mealId}/substitutes?food=${encodeURIComponent(foodName)}`);
@@ -55,10 +59,27 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
       setLoading(false);
       setError(null);
       setExhausted(false);
+      setKind(null);
+      setAvoidAll(false);
       dialog.showModal();
     }
     if (!open && dialog.open) dialog.close();
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !foodName) return;
+    let current = true;
+    apiFetch<{ option: AvoidOption | null }>(`/foods/avoid/kind?food=${encodeURIComponent(foodName)}`).then(
+      (response) => {
+        if (current) setKind(response.option);
+      },
+      // Sem o tipo, o diálogo só não oferece a opção.
+      () => undefined
+    );
+    return () => {
+      current = false;
+    };
+  }, [open, foodName]);
 
   /** Pede a lista ao backend; `append` = "Ver mais" (soma às opções e mantém a escolha). */
   async function load(nextMode: "search" | "suggest", path: string, append = false) {
@@ -133,7 +154,7 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
           event.preventDefault();
           if (!reason || choice === null) return;
           setSubmitting(true);
-          await onConfirm(reason, choice);
+          await onConfirm(reason, choice, reason === "nao-gosto" && avoidAll ? kind : null);
           setSubmitting(false);
         }}
       >
@@ -166,6 +187,24 @@ export function FoodFeedbackDialog({ mealId, foodName, mealTitle, onConfirm, onC
             </label>
           ))}
         </fieldset>
+
+        {reason === "nao-gosto" && kind && (
+          <label className="mt-3 flex shrink-0 cursor-pointer items-start gap-2 text-sm text-neutral-700">
+            <input
+              type="checkbox"
+              checked={avoidAll}
+              onChange={(event) => setAvoidAll(event.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+            />
+            <span>
+              Não como {kind.label.toLowerCase()} em nenhum preparo
+              <span className="block text-xs text-neutral-500">
+                Tira também os outros {kind.foods.count - 1} preparos do plano e das sugestões (fica em
+                &ldquo;Não gosto&rdquo;, na página Alimentos).
+              </span>
+            </span>
+          </label>
+        )}
 
         <p className="mt-5 shrink-0 text-sm font-medium text-neutral-900">Substituir por</p>
         <p className="mt-0.5 shrink-0 text-xs text-neutral-500">

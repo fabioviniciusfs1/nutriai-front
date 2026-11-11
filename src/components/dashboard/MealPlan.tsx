@@ -14,10 +14,11 @@ import {
   Trash2,
 } from "lucide-react";
 import type { FoodFeedback } from "@/lib/food-feedback";
-import type { FoodSearchOption, PlanMeal, TodayPlan } from "@/lib/api/types";
+import type { AvoidOption, FoodSearchOption, PlanMeal, TodayPlan } from "@/lib/api/types";
 import { mealSlotLabel, type MealSlot } from "@/lib/profile";
 import { invalidate, useApiQuery } from "@/lib/api/query";
 import {
+  addAvoidRule,
   addFood,
   changeMealTime,
   checkMealTime,
@@ -191,8 +192,10 @@ function MealPlanView({ plan, tabs }: { plan: TodayPlan; tabs: React.ReactNode }
   const addingFoodMeal = plan.meals.find((meal) => meal.id === addingFoodTo);
 
   // Os diálogos só fecham se o backend aceitou; se falhar, o aviso de erro aparece e dá para tentar de novo.
-  async function confirmFeedback(reason: FoodFeedback, substitute: string) {
-    if (pending && (await swapFood(pending.mealId, pending.foodName, reason, substitute))) setPending(null);
+  async function confirmFeedback(reason: FoodFeedback, substitute: string, avoidKind: AvoidOption | null) {
+    if (!pending || !(await swapFood(pending.mealId, pending.foodName, reason, substitute))) return;
+    if (avoidKind) await addAvoidRule({ kind: avoidKind.kind, label: avoidKind.label, scope: "alimento" });
+    setPending(null);
   }
 
   async function confirmAddFood(option: FoodSearchOption, grams: number) {

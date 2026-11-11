@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { saveRoutine, useAuth } from "@/lib/auth";
-import { personalizePlan } from "@/lib/api/actions";
+import { AVOID_PATH, personalizePlan, saveAvoidRules } from "@/lib/api/actions";
+import { useApiQuery } from "@/lib/api/query";
+import type { AvoidRule } from "@/lib/api/types";
 import {
   DIETS,
   MAIN_MEAL_SLOTS,
@@ -22,6 +24,7 @@ import {
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import { TimePickerDialog } from "@/components/dashboard/TimePickerDialog";
 import { OptionCard } from "@/components/profile/OptionCard";
+import { AvoidFoods } from "@/components/foods/AvoidFoods";
 import { daysLabel } from "@/lib/plan-selection";
 
 /** As 24 horas do dia; cada uma vale até a hora cheia seguinte. */
@@ -135,6 +138,10 @@ export function RoutineForm() {
   );
   const [weighInDay, setWeighInDay] = useState<Routine["weighInDay"] | null>(saved?.weighInDay ?? null);
   const [diet, setDiet] = useState<Routine["diet"] | null>(saved?.diet ?? null);
+  // "Alimentos que você não come": as salvas (depois do cadastro) até a pessoa mudar; `null` = sem mudança.
+  const savedAvoid = useApiQuery<AvoidRule[]>(saved ? AVOID_PATH : null);
+  const [avoid, setAvoid] = useState<AvoidRule[] | null>(null);
+  const avoidRules = avoid ?? savedAvoid.data ?? [];
   const [picking, setPicking] = useState<Picking | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -208,6 +215,12 @@ export function RoutineForm() {
 
   async function save(data: Routine) {
     setSaving(true);
+    // Antes da rotina: no cadastro, o assistente monta o primeiro plano já sem esses alimentos.
+    if (avoid !== null && !(await saveAvoidRules(avoid))) {
+      setSaving(false);
+      return;
+    }
+    setAvoid(null);
     const ok = await saveRoutine(data);
     setSaving(false);
     // Se falhar, o aviso de erro aparece e o usuário continua no formulário.
@@ -294,6 +307,14 @@ export function RoutineForm() {
                 ))}
               </div>
               {required(diet === null)}
+            </fieldset>
+
+            <fieldset className="mt-4">
+              <legend className="text-sm font-medium text-neutral-700">Alimentos que você não come (opcional)</legend>
+              <p className="mb-2 text-xs text-neutral-500">
+                Pesquise e escolha o tipo: o assistente não usa esses alimentos no seu plano nem nas sugestões.
+              </p>
+              <AvoidFoods rules={avoidRules} onChange={setAvoid} />
             </fieldset>
           </section>
         </div>

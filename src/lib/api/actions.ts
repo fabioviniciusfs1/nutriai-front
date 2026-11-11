@@ -1,7 +1,9 @@
 // Alterações do plano, dos alimentos e dos pesos. O backend aplica as regras e devolve o
 // resultado já calculado; o front só atualiza o cache. Cada função devolve `null` se falhou.
+import { apiFetch } from "@/lib/api/client";
 import { mutate } from "@/lib/api/query";
 import type {
+  AvoidRule,
   CalorieAdjustment,
   CalorieStep,
   DietAdjustment,
@@ -23,6 +25,7 @@ export const RESTRICTED_FOODS_PATH = "/foods/restricted";
 export const WEIGHTS_PATH = "/weights";
 export const DIET_PATH = "/me/diet";
 export const CALORIES_PATH = "/me/calories";
+export const AVOID_PATH = "/foods/avoid";
 
 /**
  * Toda mudança no plano aberto (o de hoje ou o escolhido nas abas): ele vem na resposta; os outros planos, as
@@ -74,6 +77,24 @@ export function releaseFood(foodName: string) {
     update: RESTRICTED_FOODS_PATH,
     invalidate: ["/plan/meals/"],
   });
+}
+
+/**
+ * "Alimentos que você não come": troca a lista inteira. O backend tira na hora do plano os alimentos das regras
+ * (pelo substituto mais parecido); removida a regra, eles voltam.
+ */
+export function saveAvoidRules(rules: AvoidRule[]) {
+  return mutate<AvoidRule[]>(AVOID_PATH, "PUT", { rules }, {
+    update: AVOID_PATH,
+    invalidate: ["/plan", "/nutrition", "/history"],
+  });
+}
+
+/** Acrescenta uma regra às que já estão salvas (o "Não gosto" com "Não como nenhum tipo de …"). */
+export async function addAvoidRule(rule: AvoidRule) {
+  const current = await apiFetch<AvoidRule[]>(AVOID_PATH).catch(() => null);
+  if (!current) return null;
+  return saveAvoidRules([...current.filter((item) => item.kind !== rule.kind), rule]);
 }
 
 export function addWeightEntry(kg: number, at: Date) {

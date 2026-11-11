@@ -5,24 +5,39 @@ import { ArrowRight, Undo2 } from "lucide-react";
 import { FOOD_FEEDBACK, type FoodFeedback } from "@/lib/food-feedback";
 import { FOOD_GROUPS } from "@/lib/food-groups";
 import { useApiQuery } from "@/lib/api/query";
-import { releaseFood, RESTRICTED_FOODS_PATH } from "@/lib/api/actions";
-import type { RestrictedFood } from "@/lib/api/types";
+import { AVOID_PATH, releaseFood, RESTRICTED_FOODS_PATH, saveAvoidRules } from "@/lib/api/actions";
+import type { AvoidRule, RestrictedFood } from "@/lib/api/types";
 import { QueryStatus } from "@/components/api/QueryStatus";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 
+/** Uma linha da lista: um alimento marcado no plano ou, no "Não gosto", um tipo de alimento ("Alimentos que você não come"). */
+type Marked = { kind: "food"; name: string; food: RestrictedFood } | { kind: "rule"; name: string; rule: AvoidRule };
+
 // Alimentos que o usuário marcou como "Não gosto / Não quero / Não tenho". Enquanto marcados, o
 // assistente não os recomenda. "Liberar" só tira essa restrição: as trocas já feitas nas
-// refeições continuam (o alimento não volta sozinho para o plano).
+// refeições continuam (o alimento não volta sozinho para o plano). No "Não gosto" ficam também os
+// tipos de alimento que a pessoa não come (passo 2 ou "Não como … em nenhum preparo"): liberar um deles
+// devolve os alimentos ao plano, porque a troca deles é calculada.
 export function MarkedFoods() {
   const restricted = useApiQuery<RestrictedFood[]>(RESTRICTED_FOODS_PATH);
-  const [releasing, setReleasing] = useState<string | null>(null);
+  const avoid = useApiQuery<AvoidRule[]>(AVOID_PATH);
+  const [releasing, setReleasing] = useState<Marked | null>(null);
   const [tab, setTab] = useState<FoodFeedback>("nao-gosto");
 
   const foods = restricted.data ?? [];
+  const rules = avoid.data ?? [];
   const current = FOOD_FEEDBACK.find((item) => item.id === tab)!;
-  const marked = foods
-    .filter((food) => food.feedback === tab)
-    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const markedIn = (id: FoodFeedback): Marked[] => [
+    ...(id === "nao-gosto" ? rules.map((rule) => ({ kind: "rule" as const, name: rule.label, rule })) : []),
+    ...foods.filter((food) => food.feedback === id).map((food) => ({ kind: "food" as const, name: food.name, food })),
+  ];
+  const marked = markedIn(tab).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const loaded = restricted.data && avoid.data;
+
+  function release(item: Marked) {
+    if (item.kind === "food") void releaseFood(item.name);
+    else void saveAvoidRules(rules.filter((rule) => rule.kind !== item.rule.kind));
+  }
 
   return (
     <>
@@ -59,13 +74,13 @@ export function MarkedFoods() {
               }`}
             >
               <Icon size={16} /> {label}
-              {restricted.data && (
+              {loaded && (
                 <span
                   className={`rounded-full px-1.5 py-0.5 text-xs font-medium sm:px-2 ${
                     selected ? "bg-white/25 text-white" : "bg-white/70 text-accent"
                   }`}
                 >
-                  {foods.filter((food) => food.feedback === id).length}
+                  {markedIn(id).length}
                 </span>
               )}
             </button>
@@ -73,9 +88,17 @@ export function MarkedFoods() {
         })}
       </div>
 
-      {!restricted.data && <QueryStatus error={restricted.error} onRetry={restricted.reload} />}
+      {!loaded && (
+        <QueryStatus
+          error={restricted.error ?? avoid.error}
+          onRetry={() => {
+            restricted.reload();
+            avoid.reload();
+          }}
+        />
+      )}
 
-      {restricted.data && (
+      {loaded && (
         <section
           role="tabpanel"
           id="foods-panel"
@@ -89,27 +112,37 @@ export function MarkedFoods() {
             </p>
           ) : (
             <ul className="flex flex-col divide-y divide-neutral-200">
-              {marked.map(({ name, group, onlyInMeal, substitute }) => (
-                <li key={name} className="flex items-center gap-3 py-3">
+              {marked.map((item) => (
+                <li key={`${item.kind}-${item.name}`} className="flex items-center gap-3 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-neutral-900">{name}</p>
+                    <p className="text-sm font-medium text-neutral-900">{item.name}</p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-neutral-500">
-                      {group && <span>{FOOD_GROUPS[group]} ·</span>}
-                      {onlyInMeal ? (
-                        "trocado só na refeição marcada"
-                      ) : substitute ? (
-                        <>
-                          substituído por <ArrowRight size={12} />
-                          <span className="font-medium text-neutral-700">{substitute}</span>
-                        </>
+                      {item.kind === "rule" ? (
+                        item.rule.scope === "ingrediente" ? (
+                          `todos os preparos e o que leva ${item.rule.label.replace(" (todos os tipos)", "").toLowerCase()}`
+                        ) : (
+                          "todos os preparos"
+                        )
                       ) : (
-                        "removido das refeições"
+                        <>
+                          {item.food.group && <span>{FOOD_GROUPS[item.food.group]} ·</span>}
+                          {item.food.onlyInMeal ? (
+                            "trocado só na refeição marcada"
+                          ) : item.food.substitute ? (
+                            <>
+                              substituído por <ArrowRight size={12} />
+                              <span className="font-medium text-neutral-700">{item.food.substitute}</span>
+                            </>
+                          ) : (
+                            "removido das refeições"
+                          )}
+                        </>
                       )}
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setReleasing(name)}
+                    onClick={() => setReleasing(item)}
                     className="flex shrink-0 items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
                   >
                     <Undo2 size={14} /> Liberar
@@ -123,11 +156,15 @@ export function MarkedFoods() {
 
       <ConfirmDialog
         open={releasing !== null}
-        title={`Liberar "${releasing ?? ""}"?`}
-        description={`O assistente volta a poder recomendar ${releasing ?? ""} nas próximas sugestões. As trocas já feitas nas refeições continuam.`}
+        title={`Liberar "${releasing?.name ?? ""}"?`}
+        description={
+          releasing?.kind === "rule"
+            ? `${releasing.name} volta ao plano e às sugestões, em todos os preparos.`
+            : `O assistente volta a poder recomendar ${releasing?.name ?? ""} nas próximas sugestões. As trocas já feitas nas refeições continuam.`
+        }
         confirmLabel="Liberar"
         onConfirm={() => {
-          if (releasing) void releaseFood(releasing);
+          if (releasing) release(releasing);
           setReleasing(null);
         }}
         onCancel={() => setReleasing(null)}
