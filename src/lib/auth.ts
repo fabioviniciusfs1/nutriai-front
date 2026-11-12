@@ -11,6 +11,7 @@ export type AuthState = {
   targets: Targets | null;
   weighInDue: boolean;
   calorieAdvice: Me["calorieAdvice"];
+  feedbackPending: boolean;
   google: Me["google"];
 };
 
@@ -23,6 +24,7 @@ const SIGNED_OUT: AuthState = {
   targets: null,
   weighInDue: false,
   calorieAdvice: null,
+  feedbackPending: false,
   google: null,
 };
 

@@ -10,6 +10,8 @@ import type {
   DietEstimateRequest,
   DietPreview,
   DietSettings,
+  Feedback,
+  FeedbackAnswer,
   FoodSearchOption,
   MealTimeCheck,
   RestrictedFood,
@@ -26,6 +28,7 @@ export const WEIGHTS_PATH = "/weights";
 export const DIET_PATH = "/me/diet";
 export const CALORIES_PATH = "/me/calories";
 export const AVOID_PATH = "/foods/avoid";
+export const FEEDBACK_PATH = "/feedback";
 
 /**
  * Toda mudança no plano aberto (o de hoje ou o escolhido nas abas): ele vem na resposta; os outros planos, as
@@ -133,4 +136,9 @@ export function saveDiet(settings: DietSettings) {
     update: DIET_PATH,
     invalidate: ["/plan", "/nutrition", "/history"],
   });
+}
+
+/** Envia o formulário de feedback; a notificação sai pelo /me (`feedbackPending`). */
+export function sendFeedback(answers: FeedbackAnswer[]) {
+  return mutate<Feedback>(FEEDBACK_PATH, "POST", { answers }, { update: FEEDBACK_PATH, invalidate: [ME_PATH] });
 }

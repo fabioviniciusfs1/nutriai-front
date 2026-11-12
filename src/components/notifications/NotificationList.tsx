@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Flame, Scale } from "lucide-react";
+import { Flame, MessageSquareText, Scale } from "lucide-react";
 import { useApiQuery } from "@/lib/api/query";
 import { addWeightEntry, WEIGHTS_PATH } from "@/lib/api/actions";
 import type { WeightEntry } from "@/lib/api/types";
@@ -31,7 +31,13 @@ function NotificationCard({ notification }: { notification: AppNotification }) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-white p-5 shadow-sm">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-        {notification.kind === "calories" ? <Flame size={20} /> : <Scale size={20} />}
+        {notification.kind === "calories" ? (
+          <Flame size={20} />
+        ) : notification.kind === "feedback" ? (
+          <MessageSquareText size={20} />
+        ) : (
+          <Scale size={20} />
+        )}
       </span>
       <div className="min-w-0 flex-1">
         <h3 className="font-semibold text-neutral-900">{notification.title}</h3>
@@ -44,6 +50,14 @@ function NotificationCard({ notification }: { notification: AppNotification }) {
           className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90"
         >
           Ajustar calorias
+        </Link>
+      )}
+      {notification.kind === "feedback" && (
+        <Link
+          href="/feedback"
+          className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90"
+        >
+          Responder
         </Link>
       )}
     </div>
