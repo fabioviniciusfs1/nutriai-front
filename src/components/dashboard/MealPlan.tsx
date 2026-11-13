@@ -212,9 +212,13 @@ function MealPlanView({ plan, tabs }: { plan: TodayPlan; tabs: React.ReactNode }
   async function confirmTime(value: string) {
     if (!editingTime) return;
     setCheckingTime(true);
-    // Se a conferência falhar (rede), salva direto: ela nunca impede a troca.
+    // Se a conferência falhar (rede), salva direto; só o assistente sem créditos impede a troca (o aviso fica na tela).
     const check = await checkMealTime(editingTime.id, value);
     setCheckingTime(false);
+    if (check === "blocked") {
+      setEditingTime(null);
+      return;
+    }
     if (check && !check.ok && check.message) {
       setTimeAdvice({
         ...editingTime,

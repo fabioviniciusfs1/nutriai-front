@@ -122,6 +122,12 @@ export function useMutationError() {
   );
 }
 
+/** Mostra `message` no aviso de falha, para a alteração que nem chegou a ser enviada. */
+export function showMutationError(message: string) {
+  mutationError = message;
+  notify();
+}
+
 export function dismissMutationError() {
   mutationError = null;
   notify();

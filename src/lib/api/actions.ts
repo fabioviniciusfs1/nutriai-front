@@ -1,7 +1,7 @@
 // Alterações do plano, dos alimentos e dos pesos. O backend aplica as regras e devolve o
 // resultado já calculado; o front só atualiza o cache. Cada função devolve `null` se falhou.
-import { apiFetch } from "@/lib/api/client";
-import { mutate } from "@/lib/api/query";
+import { ApiError, apiFetch } from "@/lib/api/client";
+import { mutate, showMutationError } from "@/lib/api/query";
 import type {
   AvoidRule,
   CalorieAdjustment,
@@ -42,9 +42,21 @@ function planMutation(path: string, method: string, body?: unknown, alsoInvalida
   });
 }
 
-/** O que o assistente acha do novo horário, sem salvar: `ok` = pode salvar direto. */
-export function checkMealTime(mealId: number, time: string) {
-  return mutate<MealTimeCheck>(withPlan(`/plan/meals/${mealId}/time-check`), "POST", { time });
+/**
+ * O que o assistente acha do novo horário, sem salvar: `ok` = pode salvar direto. `"blocked"` = o backend recusou
+ * a troca (`503`, assistente sem créditos): o horário não muda e o aviso fica na tela. `null` = a conferência
+ * falhou por outro motivo (rede): salva direto.
+ */
+export async function checkMealTime(mealId: number, time: string): Promise<MealTimeCheck | "blocked" | null> {
+  try {
+    return await apiFetch<MealTimeCheck>(withPlan(`/plan/meals/${mealId}/time-check`), { method: "POST", body: { time } });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 503) {
+      showMutationError(error.message);
+      return "blocked";
+    }
+    return null;
+  }
 }
 
 export function changeMealTime(mealId: number, time: string) {
